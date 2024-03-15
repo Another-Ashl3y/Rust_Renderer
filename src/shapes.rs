@@ -34,6 +34,22 @@ pub struct Triangle {
     pub center: Vec3
 }
 
+pub struct Square {
+    A: Triangle,
+    B: Triangle
+}
+
+pub struct Cube {
+    position:Vec3,
+    size:f32,
+    front: Square,
+    back: Square,
+    left: Square,
+    right: Square,
+    top: Square,
+    bottom: Square
+}
+
 impl Ray {
     pub fn get_point(&self, t:f32) -> Vec3 {
         Vec3 {x: self.point.x + (self.vector.x*t), y: self.point.y + (self.vector.y*t), z: self.point.z + (self.vector.z*t)}
@@ -83,12 +99,25 @@ impl Vec3 {
             z: A.z - B.z
         }
     }
+    pub fn add(A:&Vec3, B:&Vec3) -> Vec3 {
+        Vec3 {
+            x: A.x+B.x,
+            y: A.y+B.y,
+            z: A.z+B.z
+        }
+    }
     pub fn x_to_midpoint(A: &Vec3, B: &Vec3, C:&Vec3) -> Vec3 {
         let mid = Vec3::midpoint(B, C);
         Vec3::sub(&mid, A)
     }
     pub fn midpoint(A: &Vec3, B: &Vec3) -> Vec3{
         Vec3{x: (A.x+B.x)/2.0, y: (A.y+B.y)/2.0, z: (A.z+B.z)/2.0}
+    }
+}
+
+impl Clone for Vec3 {
+    fn clone(&self) -> Vec3 {
+        Vec3{x:self.x, y:self.y, z:self.z}
     }
 }
 
@@ -112,7 +141,7 @@ impl Triangle { // A, B, C, Normal, Center
             center: center
         }
     }
-    pub fn intersects(&self, ray: Ray) -> bool {
+    pub fn intersects(&self, ray: &Ray) -> bool {
         let denominator = Vec3::dot(&self.N, &ray.vector);
         println!("Den {}", denominator);
         println!("Normal {} {} {}", self.N.x, self.N.y, self.N.z);
@@ -136,4 +165,74 @@ impl Triangle { // A, B, C, Normal, Center
     }
 }
 
+impl Square {
+    pub fn new(top_left: Vec3, top_right: Vec3, bottom_left: Vec3, bottom_right: Vec3) -> Square {
+        Square {
+            A: Triangle::new(top_left.clone(), top_right, bottom_right.clone()),
+            B: Triangle::new(top_left, bottom_right, bottom_left)
+        }
+    }
+    pub fn intersects(&self, ray:&Ray) -> bool {
+        if self.A.intersects(&ray) || self.B.intersects(&ray) {
+            return true;
+        }
+        false
+    }
+}
+
+impl Cube {
+    pub fn new(position: Vec3, size: f32) -> Cube {
+        Cube {
+            size: size,
+            position: position.clone(),
+            front: Square::new(
+                Vec3::add(&Vec3{x:-size,y:size,z:-size}, &position),
+                Vec3::add(&Vec3{x:size,y:size,z:-size}, &position), 
+                Vec3::add(&Vec3{x:-size,y:-size,z:-size}, &position),
+                Vec3::add(&Vec3{x:size,y:-size,z:-size}, &position), 
+            ),
+            back: Square::new(
+                Vec3::add(&Vec3{x:-size,y:size,z:size}, &position),
+                Vec3::add(&Vec3{x:size,y:size,z:size}, &position), 
+                Vec3::add(&Vec3{x:-size,y:-size,z:size}, &position),
+                Vec3::add(&Vec3{x:size,y:-size,z:size}, &position), 
+            ),
+            left: Square::new(
+                Vec3::add(&Vec3{x:-size,y:size,z:size}, &position),
+                Vec3::add(&Vec3{x:-size,y:size,z:-size}, &position), 
+                Vec3::add(&Vec3{x:-size,y:-size,z:size}, &position),
+                Vec3::add(&Vec3{x:-size,y:-size,z:-size}, &position), 
+            ),
+            right: Square::new(
+                Vec3::add(&Vec3{x:size,y:size,z:-size}, &position),
+                Vec3::add(&Vec3{x:size,y:size,z:size}, &position), 
+                Vec3::add(&Vec3{x:size,y:-size,z:size}, &position),
+                Vec3::add(&Vec3{x:size,y:-size,z:-size}, &position), 
+            ),
+            top: Square::new(
+                Vec3::add(&Vec3{x:-size,y:size,z:size}, &position),
+                Vec3::add(&Vec3{x:size,y:size,z:size}, &position), 
+                Vec3::add(&Vec3{x:-size,y:size,z:-size}, &position),
+                Vec3::add(&Vec3{x:size,y:size,z:-size}, &position), 
+            ),
+            bottom: Square::new(
+                Vec3::add(&Vec3{x:-size,y:-size,z:-size}, &position),
+                Vec3::add(&Vec3{x:size,y:-size,z:-size}, &position), 
+                Vec3::add(&Vec3{x:-size,y:-size,z:size}, &position),
+                Vec3::add(&Vec3{x:size,y:-size,z:size}, &position), 
+            ),
+        }
+    }
+    pub fn get_faces(&self) -> [&Square; 6] {
+        [&self.front, &self.back, &self.left, &self.right, &self.top, &self.bottom]
+    }    
+    pub fn intersects(&self, ray:Ray) -> bool {
+        for i in self.get_faces() {
+            if i.intersects(&ray) {
+                return true;
+            }
+        }
+        false
+    }
+}
 
