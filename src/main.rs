@@ -25,7 +25,7 @@ fn main() -> Result<(), String>{
     // let width: u32 = 108;
     // let height: u32 = 64;
     // let pixel_size: u32 = 8;
-    let fov: f32 = 90.0;
+    let fov: f64 = 90.0;
 
     let cam: Camera = Camera::new(Vec3 {x:0.0, y:0.0, z:-100.0}, fov, width, height, pixel_size);
 
@@ -52,6 +52,10 @@ fn main() -> Result<(), String>{
     let mut canvas: Canvas<Window> = window.into_canvas().build().map_err(|e| e.to_string())?;
     let mut event_pump: EventPump = sdl_context.event_pump()?;
 
+    objects[0].rotate_xy(0.05, Vec3{x:0.0,y:0.0,z:0.0});
+    // objects[0].rotate_xz(-0.01, Vec3{x:20.0,y:0.0,z:150.0});
+    // objects[0].rotate_yz(0.1, Vec3{x:20.0,y:0.0,z:150.0});
+
     'running: loop {
         for event in event_pump.poll_iter() {
             match event {
@@ -71,9 +75,6 @@ fn main() -> Result<(), String>{
 
         // canvas.set_draw_color(Color::RGB(255,255,255));
         // let _ = canvas.fill_rect(Rect::new(10, 10, 10, 10));
-        objects[0].rotate_xy(0.5, Vec3{x:0.0,y:0.0,z:0.0});
-        objects[0].rotate_xz(-0.1, Vec3{x:20.0,y:0.0,z:150.0});
-        // objects[0].rotate_yz(0.1, Vec3{x:20.0,y:0.0,z:150.0});
 
         for x in 0..width {
             for y in 0..height {
