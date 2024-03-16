@@ -1,12 +1,27 @@
 #![allow(dead_code)]
 #![allow(non_snake_case)]
 
-use std::ops::Range;
+pub enum Shape {
+    Triangle(Triangle),
+    Square(Square),
+    Cube(Cube)
+}
 
+impl Shape {
+    pub fn intersects(&self, ray:&Ray) -> bool {
+        match self {
+            Shape::Triangle(x) => {return x.intersects(ray)},
+            Shape::Cube(x) => {return x.intersects(ray)},
+            Shape::Square(x) => {return x.intersects(ray)},
+            _ => println!("A shape is not yet implemented")
+        }
+        false
+    }
+}
 
 pub struct Vec2 {
-    x: f32,
-    y: f32
+    pub x: f32,
+    pub y: f32
 }
 
 pub struct Vec3 {
@@ -16,8 +31,8 @@ pub struct Vec3 {
 }
 
 pub struct Pixel {
-    position: Vec2,
-    value: bool
+    pub position: Vec2,
+    pub value: bool
 }
 
 pub struct Ray {
@@ -29,7 +44,7 @@ pub struct Camera {
     position: Vec3,
     screen: Surface,
     FOV: f32,
-    pixel_size: usize
+    pixel_size: u32
 }
 
 pub struct Surface {
@@ -62,6 +77,7 @@ pub struct Cube {
     top: Square,
     bottom: Square
 }
+
 
 impl Ray {
     pub fn get_point(&self, t:f32) -> Vec3 {
@@ -155,9 +171,14 @@ impl Triangle { // A, B, C, Normal, Center
         }
     }
     pub fn intersects(&self, ray: &Ray) -> bool {
+
+        if Vec3::dot(&self.N, &Vec3::sub(&self.A, &ray.point)) < 0.0 {
+            return false;
+        }
+
         let denominator = Vec3::dot(&self.N, &ray.vector);
-        println!("Den {}", denominator);
-        println!("Normal {} {} {}", self.N.x, self.N.y, self.N.z);
+        // println!("Den {}", denominator);
+        // println!("Normal {} {} {}", self.N.x, self.N.y, self.N.z);
         if denominator == 0.0 {return false;}
 
         let t: f32 = Vec3::dot(&self.N, &Vec3::sub(&self.A, &ray.point))/denominator;
@@ -165,7 +186,7 @@ impl Triangle { // A, B, C, Normal, Center
         let intercept: Vec3 = ray.get_point(t);
 
         let AV:Vec3 = Vec3::x_to_midpoint(&self.A, &self.B, &self.C);
-        println!("V: {} {} {}", AV.x, AV.y, AV.z);
+        // println!("V: {} {} {}", AV.x, AV.y, AV.z);
 
         let a =    Vec3::dot(&AV, &Vec3::sub(&intercept, &self.A))
                         /
@@ -178,6 +199,7 @@ impl Triangle { // A, B, C, Normal, Center
     }
 }
 
+
 impl Square {
     pub fn new(top_left: Vec3, top_right: Vec3, bottom_left: Vec3, bottom_right: Vec3) -> Square {
         Square {
@@ -185,13 +207,14 @@ impl Square {
             B: Triangle::new(top_left, bottom_right, bottom_left)
         }
     }
-    pub fn intersects(&self, ray:&Ray) -> bool {
+    fn intersects(&self, ray:&Ray) -> bool {
         if self.A.intersects(&ray) || self.B.intersects(&ray) {
             return true;
         }
         false
     }
 }
+
 
 impl Cube {
     pub fn new(position: Vec3, size: f32) -> Cube {
@@ -239,7 +262,7 @@ impl Cube {
     pub fn get_faces(&self) -> [&Square; 6] {
         [&self.front, &self.back, &self.left, &self.right, &self.top, &self.bottom]
     }    
-    pub fn intersects(&self, ray:Ray) -> bool {
+    fn intersects(&self, ray:&Ray) -> bool {
         for i in self.get_faces() {
             if i.intersects(&ray) {
                 return true;
@@ -247,42 +270,53 @@ impl Cube {
         }
         false
     }
+
 }
 
+
 impl Camera {
-    pub fn new(position: Vec3, FOV: f32, width: f32, height: f32, pixel_size: usize) -> Camera {
-        let z: f32 = position.z+((width/2.0)/((FOV/2.0).tan()));
+    pub fn new(position: Vec3, FOV: f32, width: u32, height: u32, pixel_size: u32) -> Camera {
+        let z: f32 = position.z+((width as f32/2.0)/((FOV as f32/2.0).tan()));
         Camera {
             position: position.clone(),
             FOV: FOV,
             pixel_size: pixel_size,
             screen: Surface {
-                top_left: Vec3{x:position.x-(width/2.0),y:position.y+(height/2.0),z:z},
-                top_right: Vec3{x:position.x+(width/2.0),y:position.y+(height/2.0),z:z},
-                bottom_left: Vec3{x:position.x-(width/2.0),y:position.y-(height/2.0),z:z},
-                bottom_right: Vec3{x:position.x+(width/2.0),y:position.y-(height/2.0),z:z}
+                top_left: Vec3{x:position.x-(width as f32/2.0),y:position.y+(height as f32/2.0),z:z},
+                top_right: Vec3{x:position.x+(width as f32/2.0),y:position.y+(height as f32/2.0),z:z},
+                bottom_left: Vec3{x:position.x-(width as f32/2.0),y:position.y-(height as f32/2.0),z:z},
+                bottom_right: Vec3{x:position.x+(width as f32/2.0),y:position.y-(height as f32/2.0),z:z}
             }
         }
     }
-    pub fn get_pixels(&self) -> Vec<Pixel> {
-        let q: Vec<Pixel> = Vec::new();
-        let start = &self.screen.bottom_left;
-        let end = &self.screen.top_right;
-        let mut x: f32 = start.x;
+    pub fn get_pixel(&self, ox: u32, oy: u32, shapes: &Vec<Shape>) -> Pixel {
+        let x: f32 = ox as f32 + self.screen.bottom_left.x;
+        let y: f32 = oy as f32 + self.screen.bottom_left.y;
+        
+        let ray: Ray = Ray {
+            point: Vec3{x: x,y: y,z: self.screen.bottom_left.z},
+            vector: Vec3{x: x-self.position.x,y: y-self.position.y,z: self.screen.bottom_left.z-self.position.z}
+        };
 
-        while x < end.x {
-            let mut y: f32 = start.y;
-            while y < end.y {
-                
-                q.push(value);
-
-
-                y += self.pixel_size as f32;
+        for i in shapes.iter() {
+            if i.intersects(&ray) {
+                return Pixel {
+                    position: Vec2 {x: ox as f32, y: oy as f32},
+                    value: true
+                }
             }
-            x += self.pixel_size as f32;
         }
         
-        return q;
+        Pixel { position: Vec2{x:ox as f32,y:oy as f32}, value: false }
+    }
+}
+
+impl Surface {
+    pub fn width(&self) -> f32 {
+        self.top_right.x - self.bottom_left.x
+    }
+    pub fn height(&self) -> f32 {
+        self.top_right.y - self.bottom_left.y
     }
 }
 
