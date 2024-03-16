@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 #![allow(non_snake_case)]
 
+use std::ops::Index;
+
 
 pub enum Color {
     WHITE,
@@ -231,7 +233,7 @@ impl Triangle { // A, B, C, Normal, Center
 
         let accuracy: u32 = 5;
 
-        if Vec3::dot(&self.N, &ray.point) < 0.0 {
+        if Vec3::dot(&self.N, &Vec3::sub(&self.A, &ray.point)) > 0.0 {
             return -1.0;
         }
 
@@ -354,17 +356,17 @@ impl Cube {
                 Vec3::add(&Vec3{x:size,y:-size,z:-size}, &position),
                 Vec3::add(&Vec3{x:size,y:-size,z:size}, &position), 
             ),
-            top: Square::new(
-                Vec3::add(&Vec3{x:-size,y:size,z:size}, &position),
-                Vec3::add(&Vec3{x:size,y:size,z:size}, &position), 
-                Vec3::add(&Vec3{x:-size,y:size,z:-size}, &position),
-                Vec3::add(&Vec3{x:size,y:size,z:-size}, &position), 
-            ),
             bottom: Square::new(
-                Vec3::add(&Vec3{x:size,y:-size,z:-size}, &position),
-                Vec3::add(&Vec3{x:-size,y:-size,z:-size}, &position), 
-                Vec3::add(&Vec3{x:size,y:-size,z:size}, &position),
-                Vec3::add(&Vec3{x:-size,y:-size,z:size}, &position), 
+                Vec3::add(&Vec3{x:size,y:-size,z:size}, &position), //     - + +
+                Vec3::add(&Vec3{x:-size,y:-size,z:size}, &position), //     + + +
+                Vec3::add(&Vec3{x:size,y:-size,z:-size}, &position), // - + - 
+                Vec3::add(&Vec3{x:-size,y:-size,z:-size}, &position), // + + -
+            ),
+            top: Square::new(
+                Vec3::add(&Vec3{x:size,y:size,z:-size}, &position),
+                Vec3::add(&Vec3{x:-size,y:size,z:-size}, &position), 
+                Vec3::add(&Vec3{x:size,y:size,z:size}, &position),
+                Vec3::add(&Vec3{x:-size,y:size,z:size}, &position), 
             ),
         }
     }
@@ -373,10 +375,11 @@ impl Cube {
     }    
     pub fn intersects(&self, ray:&Ray) -> f32 {
         let mut z: f32 = -1.0;
-        // let mut touchie_face = self.front;
         for i in self.get_faces() {
             let c = i.intersects(&ray);
-            if c < z && c != -1.0 || z == -1.0 {z = c;}
+            if c < z && c != -1.0 || z == -1.0 {
+                z = c;
+            }
         }
         return z;
     }

@@ -66,14 +66,14 @@ fn main() -> Result<(), String>{
 
         
 
-        canvas.set_draw_color(Color::RGB(0, 0, 0));
-        canvas.clear();
+        // canvas.set_draw_color(Color::RGB(0, 0, 0));
+        // canvas.clear();
 
         // canvas.set_draw_color(Color::RGB(255,255,255));
         // let _ = canvas.fill_rect(Rect::new(10, 10, 10, 10));
-        objects[0].rotate_xy(0.02, Vec3{x:20.0,y:0.0,z:150.0});
-        objects[0].rotate_xz(0.04, Vec3{x:20.0,y:0.0,z:150.0});
-        objects[0].rotate_yz(0.01, Vec3{x:20.0,y:0.0,z:150.0});
+        objects[0].rotate_xy(0.04, Vec3{x:20.0,y:0.0,z:150.0});
+        objects[0].rotate_xz(-0.08, Vec3{x:20.0,y:0.0,z:150.0});
+        objects[0].rotate_yz(0.02, Vec3{x:20.0,y:0.0,z:150.0});
 
         for x in 0..width {
             for y in 0..height {
