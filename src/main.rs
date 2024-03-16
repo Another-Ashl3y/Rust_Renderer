@@ -1,4 +1,5 @@
 #![allow(unused_imports)] // Remove later
+#![allow(non_upper_case_globals)]
 
 use std::time::Duration;
 
@@ -11,24 +12,31 @@ use sdl2::render::{Canvas, Texture, TextureCreator};
 use sdl2::video::{Window, WindowBuildError, WindowContext};
 
 use sdl2::{EventPump, VideoSubsystem};
-use shapes::{Triangle, Camera, Vec3, Shape};
+use shapes::{Cube, Camera, Vec3, Shape};
 mod shapes;
+
+const width: u32 = 256;
+const height: u32 = 256;
+const pixel_size: u32 = 3;
 
 fn main() -> Result<(), String>{
     // Renderer stuff
 
-    let width: u32 = 64;
-    let height: u32 = 64;
-    let pixel_size: u32 = 8;
+    // let width: u32 = 108;
+    // let height: u32 = 64;
+    // let pixel_size: u32 = 8;
     let fov: f32 = 90.0;
 
-    let cam: Camera = Camera::new(Vec3 {x:0.0, y:0.0, z:0.0}, fov, width, height, pixel_size);
+    let cam: Camera = Camera::new(Vec3 {x:0.0, y:0.0, z:-100.0}, fov, width, height, pixel_size);
 
     let mut objects: Vec<Shape> = Vec::new();
-    objects.push(Shape::Triangle(Triangle::new(
-        Vec3{x:20.0,y:0.0,z:20.0}, 
-        Vec3{x:20.0,y:20.0,z:20.0},
-        Vec3{x:0.0,y:20.0,z:20.0}
+    // objects.push(Shape::Triangle(Triangle::new(
+    //     Vec3{x:20.0,y:0.0,z:20.0}, 
+    //     Vec3{x:20.0,y:20.0,z:20.0},
+    //     Vec3{x:0.0,y:20.0,z:20.0}
+    // )));
+    objects.push(Shape::Cube(Cube::new(
+        Vec3{x:20.0,y:0.0,z:150.0}, 70.0
     )));
 
 
@@ -61,15 +69,22 @@ fn main() -> Result<(), String>{
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
 
-        canvas.set_draw_color(Color::RGB(255,255,255));
+        // canvas.set_draw_color(Color::RGB(255,255,255));
         // let _ = canvas.fill_rect(Rect::new(10, 10, 10, 10));
+        objects[0].rotate_xy(0.02, Vec3{x:20.0,y:0.0,z:150.0});
+        objects[0].rotate_xz(0.04, Vec3{x:20.0,y:0.0,z:150.0});
+        objects[0].rotate_yz(0.01, Vec3{x:20.0,y:0.0,z:150.0});
 
         for x in 0..width {
             for y in 0..height {
                 let p = cam.get_pixel(x, y, &objects);
-                if p.value {
-                    canvas.fill_rect(Rect::new(p.position.x as i32 * pixel_size as i32, p.position.y as i32 * pixel_size as i32, pixel_size, pixel_size));
-                }
+                // match p.value {
+                //     shapes::Color::WHITE => canvas.set_draw_color(Color::RGB(255, 255, 255)),
+                //     shapes::Color::GREY => canvas.set_draw_color(Color::RGB(140, 140, 140)),
+                //     shapes::Color::BLACK => canvas.set_draw_color(Color::RGB(0, 0, 0)),
+                // }
+                canvas.set_draw_color(Color::RGB((p.value*2.0) as u8, (p.value/3.0) as u8, p.value as u8));
+                canvas.fill_rect(Rect::new(p.position.x as i32 * pixel_size as i32, p.position.y as i32 * pixel_size as i32, pixel_size, pixel_size));
             }
         }
 

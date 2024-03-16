@@ -1,6 +1,13 @@
 #![allow(dead_code)]
 #![allow(non_snake_case)]
 
+
+pub enum Color {
+    WHITE,
+    GREY,
+    BLACK
+}
+
 pub enum Shape {
     Triangle(Triangle),
     Square(Square),
@@ -8,14 +15,42 @@ pub enum Shape {
 }
 
 impl Shape {
-    pub fn intersects(&self, ray:&Ray) -> bool {
+    pub fn intersects(&self, ray:&Ray) -> f32 {
         match self {
             Shape::Triangle(x) => {return x.intersects(ray)},
             Shape::Cube(x) => {return x.intersects(ray)},
             Shape::Square(x) => {return x.intersects(ray)},
+            #[allow(unreachable_patterns)]
             _ => println!("A shape is not yet implemented")
         }
-        false
+        return -1.0;
+    }
+    pub fn rotate_xy(&mut self, angle:f32, origin:Vec3) {        
+        match self {
+            Shape::Triangle(x) => x.rotate_xy(angle, origin),
+            Shape::Cube(x) => x.rotate_xy(angle, origin),
+            Shape::Square(x) => x.rotate_xy(angle, origin),
+            #[allow(unreachable_patterns)]
+            _ => println!("A shapes rotation is not yet implemented")
+        }
+    }
+    pub fn rotate_xz(&mut self, angle:f32, origin:Vec3) {        
+        match self {
+            Shape::Triangle(x) => x.rotate_xz(angle, origin),
+            Shape::Cube(x) => x.rotate_xz(angle, origin),
+            Shape::Square(x) => x.rotate_xz(angle, origin),
+            #[allow(unreachable_patterns)]
+            _ => println!("A shapes rotation is not yet implemented")
+        }
+    }
+    pub fn rotate_yz(&mut self, angle:f32, origin:Vec3) {        
+        match self {
+            Shape::Triangle(x) => x.rotate_yz(angle, origin),
+            Shape::Cube(x) => x.rotate_yz(angle, origin),
+            Shape::Square(x) => x.rotate_yz(angle, origin),
+            #[allow(unreachable_patterns)]
+            _ => println!("A shapes rotation is not yet implemented")
+        }
     }
 }
 
@@ -32,7 +67,7 @@ pub struct Vec3 {
 
 pub struct Pixel {
     pub position: Vec2,
-    pub value: bool
+    pub value: f32
 }
 
 pub struct Ray {
@@ -77,7 +112,6 @@ pub struct Cube {
     top: Square,
     bottom: Square
 }
-
 
 impl Ray {
     pub fn get_point(&self, t:f32) -> Vec3 {
@@ -135,12 +169,35 @@ impl Vec3 {
             z: A.z+B.z
         }
     }
+    pub fn mul(A:&Vec3, B:&Vec3) -> Vec3 {
+        Vec3 {
+            x: A.x * B.x,
+            y: A.y * B.y,
+            z: A.z * B.z
+        }
+    }
+    pub fn mul_f(A:&Vec3, B:f32) -> Vec3 {
+        Vec3 {
+            x: A.x * B,
+            y: A.y * B,
+            z: A.z * B
+        }
+    }
     pub fn x_to_midpoint(A: &Vec3, B: &Vec3, C:&Vec3) -> Vec3 {
         let mid = Vec3::midpoint(B, C);
         Vec3::sub(&mid, A)
     }
     pub fn midpoint(A: &Vec3, B: &Vec3) -> Vec3{
         Vec3{x: (A.x+B.x)/2.0, y: (A.y+B.y)/2.0, z: (A.z+B.z)/2.0}
+    }
+    pub fn proj(A: &Vec3, B:&Vec3) -> Vec3 {
+        Vec3::mul_f(A, Vec3::dot(A, B)/Vec3::dot(A, A))
+    }
+    pub fn bary(AB: &Vec3, CB:&Vec3, AI:&Vec3) -> f32 {
+        let AV: Vec3 = Vec3::sub(&AB, &Vec3::proj(&CB, &AB));
+
+        let a = 1.0 - Vec3::dot(&AV, &AI)/Vec3::dot(&AV, &AB);
+        a
     }
 }
 
@@ -170,35 +227,77 @@ impl Triangle { // A, B, C, Normal, Center
             center: center
         }
     }
-    pub fn intersects(&self, ray: &Ray) -> bool {
+    pub fn intersects(&self, ray: &Ray) -> f32 {
 
-        if Vec3::dot(&self.N, &Vec3::sub(&self.A, &ray.point)) < 0.0 {
-            return false;
+        let accuracy: u32 = 5;
+
+        if Vec3::dot(&self.N, &ray.point) < 0.0 {
+            return -1.0;
         }
 
         let denominator = Vec3::dot(&self.N, &ray.vector);
         // println!("Den {}", denominator);
         // println!("Normal {} {} {}", self.N.x, self.N.y, self.N.z);
-        if denominator == 0.0 {return false;}
+        if denominator == 0.0 {return -1.0}
 
         let t: f32 = Vec3::dot(&self.N, &Vec3::sub(&self.A, &ray.point))/denominator;
 
         let intercept: Vec3 = ray.get_point(t);
 
-        let AV:Vec3 = Vec3::x_to_midpoint(&self.A, &self.B, &self.C);
-        // println!("V: {} {} {}", AV.x, AV.y, AV.z);
+        // let v:Vec3 = Vec3::x_to_midpoint(&self.A, &self.B, &self.C);
 
-        let a =    Vec3::dot(&AV, &Vec3::sub(&intercept, &self.A))
-                        /
-                        Vec3::dot(&AV, &Vec3::sub(&self.B, &self.A));
+        let AB: Vec3 = Vec3::sub(&self.B, &self.A);
+        let CB: Vec3 = Vec3::sub(&self.B, &self.C);
+        let AI: Vec3 = Vec3::sub(&intercept, &self.A);
+        let a: f32 = round(Vec3::bary(&AB, &CB, &AI), accuracy);
 
-        if a >= 0.0 && a < 1.0 { // determine if it is inside the triangle using barycentric coordinates
-            return true;
+        let BC: Vec3 = Vec3::sub(&self.C, &self.B);
+        let AC: Vec3 = Vec3::sub(&self.C, &self.A);
+        let BI: Vec3 = Vec3::sub(&intercept, &self.B);
+        let b: f32 = round(Vec3::bary(&BC, &AC, &BI), accuracy);
+
+        let CA: Vec3 = Vec3::sub(&self.A, &self.C);
+        let BA: Vec3 = Vec3::sub(&self.A, &self.B);
+        let CI: Vec3 = Vec3::sub(&intercept, &self.C);
+        let c: f32 = round(Vec3::bary(&CA, &BA, &CI), accuracy);
+
+        // println!("{} {} {} {}", a,b,c,a+b+c);
+        let angle = Vec3::dot(&self.N, &Vec3::sub(&self.A, &ray.point));
+        if a >= 0.0 && b >= 0.0 && c >= 0.0 && a+b+c <= 1.0 { // determine if it is inside the triangle using barycentric coordinates
+            // println!("{}",Vec3::sub(&ray.point, &intercept).len());
+            return Vec3::sub(&ray.point, &intercept).len();
         }
-        false
+        return -1.0;
+    }
+    pub fn rotate_xy(&mut self, angle:f32, origin:Vec3) {
+        self.A.rotate_xy(angle, origin.clone());
+        self.B.rotate_xy(angle, origin.clone());
+        self.C.rotate_xy(angle, origin.clone());
+        self.N = self.get_normal();
+    }
+    pub fn rotate_xz(&mut self, angle:f32, origin:Vec3) {
+        self.A.rotate_xz(angle, origin.clone());
+        self.B.rotate_xz(angle, origin.clone());
+        self.C.rotate_xz(angle, origin.clone());
+        self.N = self.get_normal();
+    }
+    pub fn rotate_yz(&mut self, angle:f32, origin:Vec3) {
+        self.A.rotate_yz(angle, origin.clone());
+        self.B.rotate_yz(angle, origin.clone());
+        self.C.rotate_yz(angle, origin.clone());
+        self.N = self.get_normal();
+    }
+    pub fn get_normal(&self) -> Vec3 {
+        let a: Vec3 = Vec3::sub(&self.B, &self.A);
+        let b: Vec3 = Vec3::sub(&self.C, &self.A);
+        let normal: Vec3 = Vec3 {   
+            x: a.y*b.z-a.z*b.y,
+            y: a.z*b.x-a.x*b.z,
+            z: a.x*b.y-a.y*b.x};
+        normal.normalize()
+    
     }
 }
-
 
 impl Square {
     pub fn new(top_left: Vec3, top_right: Vec3, bottom_left: Vec3, bottom_right: Vec3) -> Square {
@@ -207,14 +306,24 @@ impl Square {
             B: Triangle::new(top_left, bottom_right, bottom_left)
         }
     }
-    fn intersects(&self, ray:&Ray) -> bool {
-        if self.A.intersects(&ray) || self.B.intersects(&ray) {
-            return true;
-        }
-        false
+    pub fn intersects(&self, ray:&Ray) -> f32 {
+        let a = self.A.intersects(&ray);
+        let b = self.B.intersects(&ray);
+        return (a+b)/2.0;
+    }
+    pub fn rotate_xy(&mut self, angle:f32, origin:Vec3) {
+        self.A.rotate_xy(angle, origin.clone());
+        self.B.rotate_xy(angle, origin.clone());
+    }
+    pub fn rotate_xz(&mut self, angle:f32, origin:Vec3) {
+        self.A.rotate_xz(angle, origin.clone());
+        self.B.rotate_xz(angle, origin.clone());
+    }
+    pub fn rotate_yz(&mut self, angle:f32, origin:Vec3) {
+        self.A.rotate_yz(angle, origin.clone());
+        self.B.rotate_yz(angle, origin.clone());
     }
 }
-
 
 impl Cube {
     pub fn new(position: Vec3, size: f32) -> Cube {
@@ -228,10 +337,10 @@ impl Cube {
                 Vec3::add(&Vec3{x:size,y:-size,z:-size}, &position), 
             ),
             back: Square::new(
-                Vec3::add(&Vec3{x:-size,y:size,z:size}, &position),
-                Vec3::add(&Vec3{x:size,y:size,z:size}, &position), 
-                Vec3::add(&Vec3{x:-size,y:-size,z:size}, &position),
-                Vec3::add(&Vec3{x:size,y:-size,z:size}, &position), 
+                Vec3::add(&Vec3{x:size,y:size,z:size}, &position),
+                Vec3::add(&Vec3{x:-size,y:size,z:size}, &position), 
+                Vec3::add(&Vec3{x:size,y:-size,z:size}, &position),
+                Vec3::add(&Vec3{x:-size,y:-size,z:size}, &position), 
             ),
             left: Square::new(
                 Vec3::add(&Vec3{x:-size,y:size,z:size}, &position),
@@ -242,8 +351,8 @@ impl Cube {
             right: Square::new(
                 Vec3::add(&Vec3{x:size,y:size,z:-size}, &position),
                 Vec3::add(&Vec3{x:size,y:size,z:size}, &position), 
-                Vec3::add(&Vec3{x:size,y:-size,z:size}, &position),
-                Vec3::add(&Vec3{x:size,y:-size,z:-size}, &position), 
+                Vec3::add(&Vec3{x:size,y:-size,z:-size}, &position),
+                Vec3::add(&Vec3{x:size,y:-size,z:size}, &position), 
             ),
             top: Square::new(
                 Vec3::add(&Vec3{x:-size,y:size,z:size}, &position),
@@ -252,27 +361,50 @@ impl Cube {
                 Vec3::add(&Vec3{x:size,y:size,z:-size}, &position), 
             ),
             bottom: Square::new(
-                Vec3::add(&Vec3{x:-size,y:-size,z:-size}, &position),
-                Vec3::add(&Vec3{x:size,y:-size,z:-size}, &position), 
-                Vec3::add(&Vec3{x:-size,y:-size,z:size}, &position),
-                Vec3::add(&Vec3{x:size,y:-size,z:size}, &position), 
+                Vec3::add(&Vec3{x:size,y:-size,z:-size}, &position),
+                Vec3::add(&Vec3{x:-size,y:-size,z:-size}, &position), 
+                Vec3::add(&Vec3{x:size,y:-size,z:size}, &position),
+                Vec3::add(&Vec3{x:-size,y:-size,z:size}, &position), 
             ),
         }
     }
     pub fn get_faces(&self) -> [&Square; 6] {
         [&self.front, &self.back, &self.left, &self.right, &self.top, &self.bottom]
     }    
-    fn intersects(&self, ray:&Ray) -> bool {
+    pub fn intersects(&self, ray:&Ray) -> f32 {
+        let mut z: f32 = -1.0;
+        // let mut touchie_face = self.front;
         for i in self.get_faces() {
-            if i.intersects(&ray) {
-                return true;
-            }
+            let c = i.intersects(&ray);
+            if c < z && c != -1.0 || z == -1.0 {z = c;}
         }
-        false
+        return z;
     }
-
+    pub fn rotate_xy(&mut self, angle:f32, origin:Vec3) {
+        self.front.rotate_xy(angle, origin.clone());
+        self.back.rotate_xy(angle, origin.clone());
+        self.left.rotate_xy(angle, origin.clone());
+        self.right.rotate_xy(angle, origin.clone());
+        self.top.rotate_xy(angle, origin.clone());
+        self.bottom.rotate_xy(angle, origin.clone())
+    }
+    pub fn rotate_xz(&mut self, angle:f32, origin:Vec3) {
+        self.front.rotate_xz(angle, origin.clone());
+        self.back.rotate_xz(angle, origin.clone());
+        self.left.rotate_xz(angle, origin.clone());
+        self.right.rotate_xz(angle, origin.clone());
+        self.top.rotate_xz(angle, origin.clone());
+        self.bottom.rotate_xz(angle, origin.clone())
+    }
+    pub fn rotate_yz(&mut self, angle:f32, origin:Vec3) {
+        self.front.rotate_yz(angle, origin.clone());
+        self.back.rotate_yz(angle, origin.clone());
+        self.left.rotate_yz(angle, origin.clone());
+        self.right.rotate_yz(angle, origin.clone());
+        self.top.rotate_yz(angle, origin.clone());
+        self.bottom.rotate_yz(angle, origin.clone())
+    }
 }
-
 
 impl Camera {
     pub fn new(position: Vec3, FOV: f32, width: u32, height: u32, pixel_size: u32) -> Camera {
@@ -297,17 +429,15 @@ impl Camera {
             point: Vec3{x: x,y: y,z: self.screen.bottom_left.z},
             vector: Vec3{x: x-self.position.x,y: y-self.position.y,z: self.screen.bottom_left.z-self.position.z}
         };
-
+        let mut current_z: f32 = -1.0;
         for i in shapes.iter() {
-            if i.intersects(&ray) {
-                return Pixel {
-                    position: Vec2 {x: ox as f32, y: oy as f32},
-                    value: true
-                }
-            }
+            let c: f32 = i.intersects(&ray);
+            if (c < current_z && c != -1.0) || current_z == -1.0 {current_z = c;}
         }
-        
-        Pixel { position: Vec2{x:ox as f32,y:oy as f32}, value: false }
+        // if current_z > 0.0 { println!("{}",current_z); }
+        // if current_z > 60.0 {return Pixel { position: Vec2{x:ox as f32,y:oy as f32}, value: Color::GREY };}
+        // if current_z > 0.0 {return Pixel { position: Vec2{x:ox as f32,y:oy as f32}, value: Color::WHITE };}
+        Pixel { position: Vec2{x:ox as f32,y:oy as f32}, value: current_z }
     }
 }
 
@@ -320,4 +450,7 @@ impl Surface {
     }
 }
 
-
+fn round(x: f32, decimals: u32) -> f32 {
+    let y = 10i32.pow(decimals) as f32;
+    (x * y).round() / y
+}
