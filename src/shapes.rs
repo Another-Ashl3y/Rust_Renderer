@@ -233,7 +233,7 @@ impl Triangle { // A, B, C, Normal, Center
 
         let accuracy: u32 = 5;
 
-        if Vec3::dot(&self.N, &Vec3::sub(&self.A, &ray.point)) > 0.0 {
+        if Vec3::dot(&self.N, &Vec3::sub(&self.A, &ray.point)) > 0.0 { // Check if the plane is facing the camera
             return -1.0;
         }
 

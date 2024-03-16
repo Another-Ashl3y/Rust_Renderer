@@ -36,7 +36,7 @@ fn main() -> Result<(), String>{
     //     Vec3{x:0.0,y:20.0,z:20.0}
     // )));
     objects.push(Shape::Cube(Cube::new(
-        Vec3{x:20.0,y:0.0,z:150.0}, 70.0
+        Vec3{x:20.0,y:0.0,z:150.0}, 80.0
     )));
 
 
@@ -71,9 +71,9 @@ fn main() -> Result<(), String>{
 
         // canvas.set_draw_color(Color::RGB(255,255,255));
         // let _ = canvas.fill_rect(Rect::new(10, 10, 10, 10));
-        objects[0].rotate_xy(0.04, Vec3{x:20.0,y:0.0,z:150.0});
-        objects[0].rotate_xz(-0.08, Vec3{x:20.0,y:0.0,z:150.0});
-        objects[0].rotate_yz(0.02, Vec3{x:20.0,y:0.0,z:150.0});
+        objects[0].rotate_xy(0.5, Vec3{x:0.0,y:0.0,z:0.0});
+        objects[0].rotate_xz(-0.1, Vec3{x:20.0,y:0.0,z:150.0});
+        // objects[0].rotate_yz(0.1, Vec3{x:20.0,y:0.0,z:150.0});
 
         for x in 0..width {
             for y in 0..height {
