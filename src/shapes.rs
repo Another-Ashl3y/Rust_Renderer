@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 #![allow(non_snake_case)]
 
+use std::ops::Range;
+
 
 pub struct Vec2 {
     x: f32,
@@ -13,17 +15,28 @@ pub struct Vec3 {
     pub z: f32
 }
 
+pub struct Pixel {
+    position: Vec2,
+    value: bool
+}
+
 pub struct Ray {
     pub point: Vec3,
     pub vector: Vec3
 }
 
 pub struct Camera {
-    pub position: Vec3,
-    pub width: f32,
-    pub height: f32,
-    pub fov: f32,
-    pub pixel_size: i32
+    position: Vec3,
+    screen: Surface,
+    FOV: f32,
+    pixel_size: usize
+}
+
+pub struct Surface {
+    top_left: Vec3,
+    top_right: Vec3,
+    bottom_left: Vec3,
+    bottom_right: Vec3
 }
 
 pub struct Triangle {
@@ -235,4 +248,42 @@ impl Cube {
         false
     }
 }
+
+impl Camera {
+    pub fn new(position: Vec3, FOV: f32, width: f32, height: f32, pixel_size: usize) -> Camera {
+        let z: f32 = position.z+((width/2.0)/((FOV/2.0).tan()));
+        Camera {
+            position: position.clone(),
+            FOV: FOV,
+            pixel_size: pixel_size,
+            screen: Surface {
+                top_left: Vec3{x:position.x-(width/2.0),y:position.y+(height/2.0),z:z},
+                top_right: Vec3{x:position.x+(width/2.0),y:position.y+(height/2.0),z:z},
+                bottom_left: Vec3{x:position.x-(width/2.0),y:position.y-(height/2.0),z:z},
+                bottom_right: Vec3{x:position.x+(width/2.0),y:position.y-(height/2.0),z:z}
+            }
+        }
+    }
+    pub fn get_pixels(&self) -> Vec<Pixel> {
+        let q: Vec<Pixel> = Vec::new();
+        let start = &self.screen.bottom_left;
+        let end = &self.screen.top_right;
+        let mut x: f32 = start.x;
+
+        while x < end.x {
+            let mut y: f32 = start.y;
+            while y < end.y {
+                
+                q.push(value);
+
+
+                y += self.pixel_size as f32;
+            }
+            x += self.pixel_size as f32;
+        }
+        
+        return q;
+    }
+}
+
 
