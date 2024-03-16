@@ -5,15 +5,15 @@ use std::ops::Index;
 
 
 pub enum Color {
-    WHITE,
-    GREY,
-    BLACK
+    White,
+    Grey,
+    Black
 }
 
 pub enum Shape {
     Triangle(Triangle),
     Square(Square),
-    Cube(Cube)
+    Cube(Box<Cube>)
 }
 
 impl Shape {
@@ -25,7 +25,7 @@ impl Shape {
             #[allow(unreachable_patterns)]
             _ => println!("A shape is not yet implemented")
         }
-        return -1.0;
+        -1.0
     }
     pub fn rotate_xy(&mut self, angle:f64, origin:Vec3) {        
         match self {
@@ -196,10 +196,9 @@ impl Vec3 {
         Vec3::mul_f(A, Vec3::dot(A, B)/Vec3::dot(A, A))
     }
     pub fn bary(AB: &Vec3, CB:&Vec3, AI:&Vec3) -> f64 {
-        let AV: Vec3 = Vec3::sub(&AB, &Vec3::proj(&CB, &AB));
+        let AV: Vec3 = Vec3::sub(AB, &Vec3::proj(CB, AB));
 
-        let a = 1.0 - Vec3::dot(&AV, &AI)/Vec3::dot(&AV, &AB);
-        a
+        1.0 - Vec3::dot(&AV, AI)/Vec3::dot(&AV, AB)
     }
 }
 
@@ -224,9 +223,9 @@ impl Triangle { // A, B, C, Normal, Center
         normal = normal.normalize();
 
         Triangle {
-            A: A, B: B, C: C,
+            A, B,  C,
             N: normal,
-            center: center
+            center
         }
     }
     pub fn intersects(&self, ray: &Ray) -> f64 {
@@ -264,12 +263,12 @@ impl Triangle { // A, B, C, Normal, Center
         let c: f64 = Vec3::bary(&CA, &BA, &CI);
 
         // println!("{} {} {} {}", a,b,c,a+b+c);
-        let angle = Vec3::dot(&self.N, &Vec3::sub(&self.A, &ray.point));
+        // let angle = Vec3::dot(&self.N, &Vec3::sub(&self.A, &ray.point));
         if a >= 0.0 && b >= 0.0 && c >= 0.0 && a+b+c <= 1.0 { // determine if it is inside the triangle using barycentric coordinates
             // println!("{}",Vec3::sub(&ray.point, &intercept).len());
             return Vec3::sub(&ray.point, &intercept).len();
         }
-        return -1.0;
+        -1.0
     }
     pub fn rotate_xy(&mut self, angle:f64, origin:Vec3) {
         self.A.rotate_xy(angle, origin.clone());
@@ -309,9 +308,9 @@ impl Square {
         }
     }
     pub fn intersects(&self, ray:&Ray) -> f64 {
-        let a = self.A.intersects(&ray);
-        let b = self.B.intersects(&ray);
-        return (a+b)/2.0;
+        let a = self.A.intersects(ray);
+        let b = self.B.intersects(ray);
+        (a+b)/2.0
     }
     pub fn rotate_xy(&mut self, angle:f64, origin:Vec3) {
         self.A.rotate_xy(angle, origin.clone());
@@ -330,7 +329,7 @@ impl Square {
 impl Cube {
     pub fn new(position: Vec3, size: f64) -> Cube {
         Cube {
-            size: size,
+            size,
             position: position.clone(),
             front: Square::new(
                 Vec3::add(&Vec3{x:-size,y:size,z:-size}, &position),
@@ -376,12 +375,12 @@ impl Cube {
     pub fn intersects(&self, ray:&Ray) -> f64 {
         let mut z: f64 = -1.0;
         for i in self.get_faces() {
-            let c = i.intersects(&ray);
+            let c = i.intersects(ray);
             if c < z && c != -1.0 || z == -1.0 {
                 z = c;
             }
         }
-        return z;
+        z
     }
     pub fn rotate_xy(&mut self, angle:f64, origin:Vec3) {
         self.front.rotate_xy(angle, origin.clone());
@@ -411,25 +410,25 @@ impl Cube {
 
 impl Camera {
     pub fn new(position: Vec3, FOV: f64, width: u32, height: u32, pixel_size: u32) -> Camera {
-        let z: f64 = position.z+((width as f64/2.0)/((FOV as f64/2.0).tan()));
+        let z: f64 = position.z+((width as f64/2.0)/((FOV/2.0).tan()));
         Camera {
             position: position.clone(),
-            FOV: FOV,
-            pixel_size: pixel_size,
+            FOV,
+            pixel_size,
             screen: Surface {
-                top_left: Vec3{x:position.x-(width as f64/2.0),y:position.y+(height as f64/2.0),z:z},
-                top_right: Vec3{x:position.x+(width as f64/2.0),y:position.y+(height as f64/2.0),z:z},
-                bottom_left: Vec3{x:position.x-(width as f64/2.0),y:position.y-(height as f64/2.0),z:z},
-                bottom_right: Vec3{x:position.x+(width as f64/2.0),y:position.y-(height as f64/2.0),z:z}
+                top_left: Vec3{x:position.x-(width as f64/2.0),y:position.y+(height as f64/2.0),z},
+                top_right: Vec3{x:position.x+(width as f64/2.0),y:position.y+(height as f64/2.0),z},
+                bottom_left: Vec3{x:position.x-(width as f64/2.0),y:position.y-(height as f64/2.0),z},
+                bottom_right: Vec3{x:position.x+(width as f64/2.0),y:position.y-(height as f64/2.0),z}
             }
         }
     }
-    pub fn get_pixel(&self, ox: u32, oy: u32, shapes: &Vec<Shape>) -> Pixel {
+    pub fn get_pixel(&self, ox: u32, oy: u32, shapes: &[Shape]) -> Pixel {
         let x: f64 = ox as f64 + self.screen.bottom_left.x;
         let y: f64 = oy as f64 + self.screen.bottom_left.y;
         
         let ray: Ray = Ray {
-            point: Vec3{x: x,y: y,z: self.screen.bottom_left.z},
+            point: Vec3{x,y,z: self.screen.bottom_left.z},
             vector: Vec3{x: x-self.position.x,y: y-self.position.y,z: self.screen.bottom_left.z-self.position.z}
         };
         let mut current_z: f64 = -1.0;

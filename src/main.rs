@@ -29,15 +29,12 @@ fn main() -> Result<(), String>{
 
     let cam: Camera = Camera::new(Vec3 {x:0.0, y:0.0, z:-100.0}, fov, width, height, pixel_size);
 
-    let mut objects: Vec<Shape> = Vec::new();
+    let mut objects: Vec<Shape> = vec![Shape::Cube(Box::new(Cube::new(Vec3{x:20.0,y:0.0,z:150.0}, 80.0)))];
     // objects.push(Shape::Triangle(Triangle::new(
     //     Vec3{x:20.0,y:0.0,z:20.0}, 
     //     Vec3{x:20.0,y:20.0,z:20.0},
     //     Vec3{x:0.0,y:20.0,z:20.0}
     // )));
-    objects.push(Shape::Cube(Cube::new(
-        Vec3{x:20.0,y:0.0,z:150.0}, 80.0
-    )));
 
 
     // Build screen
@@ -85,7 +82,7 @@ fn main() -> Result<(), String>{
                 //     shapes::Color::BLACK => canvas.set_draw_color(Color::RGB(0, 0, 0)),
                 // }
                 canvas.set_draw_color(Color::RGB((p.value*2.0) as u8, (p.value/3.0) as u8, p.value as u8));
-                canvas.fill_rect(Rect::new(p.position.x as i32 * pixel_size as i32, p.position.y as i32 * pixel_size as i32, pixel_size, pixel_size));
+                let _ = canvas.fill_rect(Rect::new(p.position.x as i32 * pixel_size as i32, p.position.y as i32 * pixel_size as i32, pixel_size, pixel_size));
             }
         }
 
