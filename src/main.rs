@@ -17,7 +17,7 @@ mod shapes;
 
 const width: u32 = 256;
 const height: u32 = 256;
-const pixel_size: u32 = 3;
+const pixel_size: u32 = 8;
 
 fn main() -> Result<(), String>{
     // Renderer stuff
@@ -50,8 +50,8 @@ fn main() -> Result<(), String>{
     let mut event_pump: EventPump = sdl_context.event_pump()?;
 
     objects[0].rotate_xy(0.05, Vec3{x:0.0,y:0.0,z:0.0});
-    // objects[0].rotate_xz(-0.01, Vec3{x:20.0,y:0.0,z:150.0});
-    // objects[0].rotate_yz(0.1, Vec3{x:20.0,y:0.0,z:150.0});
+    objects[0].rotate_xz(-0.01, Vec3{x:20.0,y:0.0,z:150.0});
+    objects[0].rotate_yz(0.1, Vec3{x:20.0,y:0.0,z:150.0});
 
     'running: loop {
         for event in event_pump.poll_iter() {
@@ -86,11 +86,13 @@ fn main() -> Result<(), String>{
             }
         }
 
+        objects[0].rotate_xy(0.0005, Vec3{x:0.0,y:0.0,z:0.0});
+        objects[0].rotate_xz(-0.0001, Vec3{x:20.0,y:0.0,z:150.0});
+        objects[0].rotate_yz(0.001, Vec3{x:20.0,y:0.0,z:150.0});
 
         canvas.present();
         ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 30));
         // The rest of the game loop goes here...
     }
     Ok(())
-
 }

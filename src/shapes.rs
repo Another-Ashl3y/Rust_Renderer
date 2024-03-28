@@ -12,7 +12,6 @@ pub enum Color {
 
 pub enum Shape {
     Triangle(Triangle),
-    Square(Square),
     Cube(Box<Cube>)
 }
 
@@ -21,7 +20,6 @@ impl Shape {
         match self {
             Shape::Triangle(x) => {return x.intersects(ray)},
             Shape::Cube(x) => {return x.intersects(ray)},
-            Shape::Square(x) => {return x.intersects(ray)},
             #[allow(unreachable_patterns)]
             _ => println!("A shape is not yet implemented")
         }
@@ -31,7 +29,6 @@ impl Shape {
         match self {
             Shape::Triangle(x) => x.rotate_xy(angle, origin),
             Shape::Cube(x) => x.rotate_xy(angle, origin),
-            Shape::Square(x) => x.rotate_xy(angle, origin),
             #[allow(unreachable_patterns)]
             _ => println!("A shapes rotation is not yet implemented")
         }
@@ -40,7 +37,6 @@ impl Shape {
         match self {
             Shape::Triangle(x) => x.rotate_xz(angle, origin),
             Shape::Cube(x) => x.rotate_xz(angle, origin),
-            Shape::Square(x) => x.rotate_xz(angle, origin),
             #[allow(unreachable_patterns)]
             _ => println!("A shapes rotation is not yet implemented")
         }
@@ -49,7 +45,6 @@ impl Shape {
         match self {
             Shape::Triangle(x) => x.rotate_yz(angle, origin),
             Shape::Cube(x) => x.rotate_yz(angle, origin),
-            Shape::Square(x) => x.rotate_yz(angle, origin),
             #[allow(unreachable_patterns)]
             _ => println!("A shapes rotation is not yet implemented")
         }
@@ -95,24 +90,12 @@ pub struct Triangle {
     pub A: Vec3, // Point A
     pub B: Vec3, // Point B
     pub C: Vec3, // Point C
-    pub N: Vec3,  // Normal Vector
-    pub center: Vec3
-}
-
-pub struct Square {
-    A: Triangle,
-    B: Triangle
 }
 
 pub struct Cube {
     position:Vec3,
-    size:f64,
-    front: Square,
-    back: Square,
-    left: Square,
-    right: Square,
-    top: Square,
-    bottom: Square
+    rotation:Vec3,
+    size:f64
 }
 
 impl Ray {
@@ -131,17 +114,26 @@ impl Vec3 {
     pub fn as_string(&self) -> String {
         format!("({}, {}, {})",self.x,self.y,self.z).to_string()
     }
-    pub fn rotate_xy(&mut self, angle:f64, origin: Vec3) {
-        self.x = ((self.x-origin.x)*angle.cos()+(self.y-origin.y)*-angle.sin())+origin.x;
-        self.y = ((self.x-origin.x)*angle.sin()+(self.y-origin.y)*angle.cos())+origin.y;
+    pub fn rotate_xy(&mut self, angle:f64, origin: Vec3) {        
+        *self = Self {
+            x: ((self.x-origin.x)*angle.cos()+(self.y-origin.y)*-angle.sin())+origin.x,
+            y: ((self.x-origin.x)*angle.sin()+(self.y-origin.y)*angle.cos())+origin.y,
+            ..self.clone()
+        };
     }
     pub fn rotate_xz(&mut self, angle:f64, origin: Vec3) {
-        self.x = ((self.x-origin.x)*angle.cos()+(self.z-origin.z)*-angle.sin())+origin.x;
-        self.z = ((self.x-origin.x)*angle.sin()+(self.z-origin.z)*angle.cos())+origin.z;
+        *self = Self {
+            x: ((self.x-origin.x)*angle.cos()+(self.z-origin.z)*-angle.sin())+origin.x,
+            z: ((self.x-origin.x)*angle.sin()+(self.z-origin.z)*angle.cos())+origin.z,
+            ..self.clone()
+        }
     }
     pub fn rotate_yz(&mut self, angle:f64, origin: Vec3) {
-        self.y = ((self.y-origin.y)*angle.cos()+(self.z-origin.z)*-angle.sin())+origin.y;
-        self.z = ((self.y-origin.y)*angle.sin()+(self.z-origin.z)*angle.cos())+origin.z;
+        *self = Self {
+            y: ((self.y-origin.y)*angle.cos()+(self.z-origin.z)*-angle.sin())+origin.y,
+            z: ((self.y-origin.y)*angle.sin()+(self.z-origin.z)*angle.cos())+origin.z,
+            ..self.clone()
+        }
     }
     pub fn len(&self) -> f64 {
         (self.x.powi(2)+self.y.powi(2)+self.z.powi(2)).powf(0.5) // Return the length of vector
@@ -208,40 +200,26 @@ impl Clone for Vec3 {
     }
 }
 
-impl Triangle { // A, B, C, Normal, Center
+impl Triangle {
     pub fn new(A: Vec3, B : Vec3, C: Vec3) -> Triangle {
-        let center = Vec3 {   x: (A.x + B.x + C.x)/3.0,
-                                    y: (A.y + B.y + C.y)/3.0,
-                                    z: (A.z + B.z + C.z)/3.0};
-        let a = Vec3::sub(&B, &A);
-        let b = Vec3::sub(&C, &A);
-
-        let mut normal: Vec3 = Vec3 {   
-            x: a.y*b.z-a.z*b.y,
-            y: a.z*b.x-a.x*b.z,
-            z: a.x*b.y-a.y*b.x};
-        normal = normal.normalize();
-
         Triangle {
-            A, B,  C,
-            N: normal,
-            center
+            A, B,  C
         }
     }
     pub fn intersects(&self, ray: &Ray) -> f64 {
 
         // let accuracy: u32 = 16;
 
-        if Vec3::dot(&self.N, &Vec3::sub(&self.A, &ray.point)) > 0.0 { // Check if the plane is facing the camera
+        if Vec3::dot(&self.get_normal(), &Vec3::sub(&self.A, &ray.point)) > 0.0 { // Check if the plane is facing the camera
             return -1.0;
         }
 
-        let denominator = Vec3::dot(&self.N, &ray.vector);
+        let denominator = Vec3::dot(&self.get_normal(), &ray.vector);
         // println!("Den {}", denominator);
         // println!("Normal {} {} {}", self.N.x, self.N.y, self.N.z);
         if denominator == 0.0 {return -1.0}
 
-        let t: f64 = Vec3::dot(&self.N, &Vec3::sub(&self.A, &ray.point))/denominator;
+        let t: f64 = Vec3::dot(&self.get_normal(), &Vec3::sub(&self.A, &ray.point))/denominator;
 
         let intercept: Vec3 = ray.get_point(t);
 
@@ -264,7 +242,7 @@ impl Triangle { // A, B, C, Normal, Center
 
         // println!("{} {} {} {}", a,b,c,a+b+c);
         // let angle = Vec3::dot(&self.N, &Vec3::sub(&self.A, &ray.point));
-        if a >= 0.0 && b >= 0.0 && c >= 0.0 && a+b+c <= 1.0 { // determine if it is inside the triangle using barycentric coordinates
+        if a >= -0.01 && b >= -0.01 && c >= -0.01 && a+b+c <= 1.01 { // determine if it is inside the triangle using barycentric coordinates
             // println!("{}",Vec3::sub(&ray.point, &intercept).len());
             return Vec3::sub(&ray.point, &intercept).len();
         }
@@ -274,19 +252,16 @@ impl Triangle { // A, B, C, Normal, Center
         self.A.rotate_xy(angle, origin.clone());
         self.B.rotate_xy(angle, origin.clone());
         self.C.rotate_xy(angle, origin.clone());
-        self.N = self.get_normal();
     }
     pub fn rotate_xz(&mut self, angle:f64, origin:Vec3) {
         self.A.rotate_xz(angle, origin.clone());
         self.B.rotate_xz(angle, origin.clone());
         self.C.rotate_xz(angle, origin.clone());
-        self.N = self.get_normal();
     }
     pub fn rotate_yz(&mut self, angle:f64, origin:Vec3) {
         self.A.rotate_yz(angle, origin.clone());
         self.B.rotate_yz(angle, origin.clone());
         self.C.rotate_yz(angle, origin.clone());
-        self.N = self.get_normal();
     }
     pub fn get_normal(&self) -> Vec3 {
         let a: Vec3 = Vec3::sub(&self.B, &self.A);
@@ -296,85 +271,89 @@ impl Triangle { // A, B, C, Normal, Center
             y: a.z*b.x-a.x*b.z,
             z: a.x*b.y-a.y*b.x};
         normal.normalize()
-    
+    }
+    pub fn Copy(&self) -> Triangle {
+        Triangle {
+            A: self.A.clone(),
+            B: self.B.clone(),
+            C: self.C.clone()
+        }
     }
 }
 
-impl Square {
-    pub fn new(top_left: Vec3, top_right: Vec3, bottom_left: Vec3, bottom_right: Vec3) -> Square {
-        Square {
-            A: Triangle::new(top_left.clone(), top_right, bottom_right.clone()),
-            B: Triangle::new(top_left, bottom_right, bottom_left)
-        }
-    }
-    pub fn intersects(&self, ray:&Ray) -> f64 {
-        let a = self.A.intersects(ray);
-        let b = self.B.intersects(ray);
-        (a+b)/2.0
-    }
-    pub fn rotate_xy(&mut self, angle:f64, origin:Vec3) {
-        self.A.rotate_xy(angle, origin.clone());
-        self.B.rotate_xy(angle, origin.clone());
-    }
-    pub fn rotate_xz(&mut self, angle:f64, origin:Vec3) {
-        self.A.rotate_xz(angle, origin.clone());
-        self.B.rotate_xz(angle, origin.clone());
-    }
-    pub fn rotate_yz(&mut self, angle:f64, origin:Vec3) {
-        self.A.rotate_yz(angle, origin.clone());
-        self.B.rotate_yz(angle, origin.clone());
-    }
+pub fn square(top_left: Vec3, top_right: Vec3, bottom_left: Vec3, bottom_right: Vec3) -> [Triangle; 2] {
+    [
+        Triangle::new(top_left.clone(), top_right, bottom_right.clone()),
+        Triangle::new(top_left, bottom_right, bottom_left)
+    ]
 }
+
 
 impl Cube {
     pub fn new(position: Vec3, size: f64) -> Cube {
         Cube {
             size,
-            position: position.clone(),
-            front: Square::new(
-                Vec3::add(&Vec3{x:-size,y:size,z:-size}, &position),
-                Vec3::add(&Vec3{x:size,y:size,z:-size}, &position), 
-                Vec3::add(&Vec3{x:-size,y:-size,z:-size}, &position),
-                Vec3::add(&Vec3{x:size,y:-size,z:-size}, &position), 
-            ),
-            back: Square::new(
-                Vec3::add(&Vec3{x:size,y:size,z:size}, &position),
-                Vec3::add(&Vec3{x:-size,y:size,z:size}, &position), 
-                Vec3::add(&Vec3{x:size,y:-size,z:size}, &position),
-                Vec3::add(&Vec3{x:-size,y:-size,z:size}, &position), 
-            ),
-            left: Square::new(
-                Vec3::add(&Vec3{x:-size,y:size,z:size}, &position),
-                Vec3::add(&Vec3{x:-size,y:size,z:-size}, &position), 
-                Vec3::add(&Vec3{x:-size,y:-size,z:size}, &position),
-                Vec3::add(&Vec3{x:-size,y:-size,z:-size}, &position), 
-            ),
-            right: Square::new(
-                Vec3::add(&Vec3{x:size,y:size,z:-size}, &position),
-                Vec3::add(&Vec3{x:size,y:size,z:size}, &position), 
-                Vec3::add(&Vec3{x:size,y:-size,z:-size}, &position),
-                Vec3::add(&Vec3{x:size,y:-size,z:size}, &position), 
-            ),
-            bottom: Square::new(
-                Vec3::add(&Vec3{x:size,y:-size,z:size}, &position), //     - + +
-                Vec3::add(&Vec3{x:-size,y:-size,z:size}, &position), //     + + +
-                Vec3::add(&Vec3{x:size,y:-size,z:-size}, &position), // - + - 
-                Vec3::add(&Vec3{x:-size,y:-size,z:-size}, &position), // + + -
-            ),
-            top: Square::new(
-                Vec3::add(&Vec3{x:size,y:size,z:-size}, &position),
-                Vec3::add(&Vec3{x:-size,y:size,z:-size}, &position), 
-                Vec3::add(&Vec3{x:size,y:size,z:size}, &position),
-                Vec3::add(&Vec3{x:-size,y:size,z:size}, &position), 
-            ),
+            rotation: Vec3{x:0.0,y:0.0,z:0.0},
+            position: position.clone()
         }
     }
-    pub fn get_faces(&self) -> [&Square; 6] {
-        [&self.front, &self.back, &self.left, &self.right, &self.top, &self.bottom]
-    }    
+    fn get_triangles(&self) -> Vec<Triangle> {
+        let faces: [[Triangle; 2]; 6] = [
+            square(
+            Vec3::add(&Vec3{x:-self.size,y:self.size,z:-self.size}, &self.position),
+            Vec3::add(&Vec3{x:self.size,y:self.size,z:-self.size}, &self.position), 
+            Vec3::add(&Vec3{x:-self.size,y:-self.size,z:-self.size}, &self.position),
+            Vec3::add(&Vec3{x:self.size,y:-self.size,z:-self.size}, &self.position), 
+        ),
+            square(
+            Vec3::add(&Vec3{x:self.size,y:self.size,z:self.size}, &self.position),
+            Vec3::add(&Vec3{x:-self.size,y:self.size,z:self.size}, &self.position), 
+            Vec3::add(&Vec3{x:self.size,y:-self.size,z:self.size}, &self.position),
+            Vec3::add(&Vec3{x:-self.size,y:-self.size,z:self.size}, &self.position), 
+        ),
+            square(
+            Vec3::add(&Vec3{x:-self.size,y:self.size,z:self.size}, &self.position),
+            Vec3::add(&Vec3{x:-self.size,y:self.size,z:-self.size}, &self.position), 
+            Vec3::add(&Vec3{x:-self.size,y:-self.size,z:self.size}, &self.position),
+            Vec3::add(&Vec3{x:-self.size,y:-self.size,z:-self.size}, &self.position), 
+        ),
+            square(
+            Vec3::add(&Vec3{x:self.size,y:self.size,z:-self.size}, &self.position),
+            Vec3::add(&Vec3{x:self.size,y:self.size,z:self.size}, &self.position), 
+            Vec3::add(&Vec3{x:self.size,y:-self.size,z:-self.size}, &self.position),
+            Vec3::add(&Vec3{x:self.size,y:-self.size,z:self.size}, &self.position), 
+        ),
+            square(
+            Vec3::add(&Vec3{x:self.size,y:-self.size,z:self.size}, &self.position), //     - + +
+            Vec3::add(&Vec3{x:-self.size,y:-self.size,z:self.size}, &self.position), //     + + +
+            Vec3::add(&Vec3{x:self.size,y:-self.size,z:-self.size}, &self.position), // - + - 
+            Vec3::add(&Vec3{x:-self.size,y:-self.size,z:-self.size}, &self.position), // + + -
+        ),
+            square(
+            Vec3::add(&Vec3{x:self.size,y:self.size,z:-self.size}, &self.position),
+            Vec3::add(&Vec3{x:-self.size,y:self.size,z:-self.size}, &self.position), 
+            Vec3::add(&Vec3{x:self.size,y:self.size,z:self.size}, &self.position),
+            Vec3::add(&Vec3{x:-self.size,y:self.size,z:self.size}, &self.position), 
+        )];
+        let mut triangles: Vec<Triangle> = Vec::new();
+        for i in faces {
+            let mut tri = i[0].Copy();
+            let mut tri2 = i[1].Copy();
+            tri.rotate_xy(self.rotation.z, self.position.clone());
+            tri2.rotate_xy(self.rotation.z, self.position.clone());
+            tri.rotate_yz(self.rotation.x, self.position.clone());
+            tri2.rotate_yz(self.rotation.x, self.position.clone());
+            tri.rotate_xz(self.rotation.y, self.position.clone());
+            tri2.rotate_xz(self.rotation.y, self.position.clone());
+            triangles.push(tri);
+            triangles.push(tri2);
+        };
+        triangles
+        
+    }
     pub fn intersects(&self, ray:&Ray) -> f64 {
         let mut z: f64 = -1.0;
-        for i in self.get_faces() {
+        for i in self.get_triangles() {
             let c = i.intersects(ray);
             if c < z && c != -1.0 || z == -1.0 {
                 z = c;
@@ -383,28 +362,16 @@ impl Cube {
         z
     }
     pub fn rotate_xy(&mut self, angle:f64, origin:Vec3) {
-        self.front.rotate_xy(angle, origin.clone());
-        self.back.rotate_xy(angle, origin.clone());
-        self.left.rotate_xy(angle, origin.clone());
-        self.right.rotate_xy(angle, origin.clone());
-        self.top.rotate_xy(angle, origin.clone());
-        self.bottom.rotate_xy(angle, origin.clone())
+        self.position.rotate_xy(angle, origin.clone());
+        self.rotation.rotate_xy(angle, origin);
     }
     pub fn rotate_xz(&mut self, angle:f64, origin:Vec3) {
-        self.front.rotate_xz(angle, origin.clone());
-        self.back.rotate_xz(angle, origin.clone());
-        self.left.rotate_xz(angle, origin.clone());
-        self.right.rotate_xz(angle, origin.clone());
-        self.top.rotate_xz(angle, origin.clone());
-        self.bottom.rotate_xz(angle, origin.clone())
+        self.position.rotate_xz(angle, origin.clone());
+        self.rotation.rotate_xz(angle, origin);
     }
     pub fn rotate_yz(&mut self, angle:f64, origin:Vec3) {
-        self.front.rotate_yz(angle, origin.clone());
-        self.back.rotate_yz(angle, origin.clone());
-        self.left.rotate_yz(angle, origin.clone());
-        self.right.rotate_yz(angle, origin.clone());
-        self.top.rotate_yz(angle, origin.clone());
-        self.bottom.rotate_yz(angle, origin.clone())
+        self.position.rotate_yz(angle, origin.clone());
+        self.rotation.rotate_yz(angle, origin);
     }
 }
 
