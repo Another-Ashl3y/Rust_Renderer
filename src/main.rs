@@ -15,8 +15,8 @@ use sdl2::{EventPump, VideoSubsystem};
 use shapes::{Cube, Camera, Vec3, Shape};
 mod shapes;
 
-const width: u32 = 256;
-const height: u32 = 256;
+const width: u32 = 64;
+const height: u32 = 64;
 const pixel_size: u32 = 8;
 
 fn main() -> Result<(), String>{
@@ -29,7 +29,7 @@ fn main() -> Result<(), String>{
 
     let cam: Camera = Camera::new(Vec3 {x:0.0, y:0.0, z:-100.0}, fov, width, height, pixel_size);
 
-    let mut objects: Vec<Shape> = vec![Shape::Cube(Box::new(Cube::new(Vec3{x:20.0,y:0.0,z:150.0}, 80.0)))];
+    let mut objects: Vec<Shape> = vec![Shape::Cube(Box::new(Cube::new(Vec3{x:20.0,y:0.0,z:200.0}, 150.0)))];
     // objects.push(Shape::Triangle(Triangle::new(
     //     Vec3{x:20.0,y:0.0,z:20.0}, 
     //     Vec3{x:20.0,y:20.0,z:20.0},
