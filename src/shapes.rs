@@ -1,50 +1,56 @@
 #![allow(dead_code)]
 #![allow(non_snake_case)]
 
+use std::io::Read;
+use std::mem::discriminant;
 use std::ops::Index;
-
+use std::fs::File;
 
 pub enum Color {
     White,
     Grey,
     Black
 }
-
+#[derive(Clone)]
+#[derive(PartialEq)]
 pub enum Shape {
     Triangle(Triangle),
-    Cube(Box<Cube>)
+    Cube(Cube),
+    Object(Object),
+    None
 }
 
 impl Shape {
-    pub fn intersects(&self, ray:&Ray) -> f64 {
+    pub fn intersects(&self, ray:&Ray) -> Lexip {
         match self {
             Shape::Triangle(x) => {return x.intersects(ray)},
             Shape::Cube(x) => {return x.intersects(ray)},
+            Shape::Object(x) => {return x.intersects(ray)},
             #[allow(unreachable_patterns)]
             _ => println!("A shape is not yet implemented")
         }
-        -1.0
+        Lexip::empty()
     }
-    pub fn rotate_xy(&mut self, angle:f64, origin:Vec3) {        
+    pub fn rotateZ(&mut self, angle:f64, origin:Vec3) {        
         match self {
-            Shape::Triangle(x) => x.rotate_xy(angle, origin),
-            Shape::Cube(x) => x.rotate_xy(angle, origin),
+            Shape::Triangle(x) => x.rotateZ(angle, origin),
+            Shape::Cube(x) => x.rotateZ(angle, origin),
             #[allow(unreachable_patterns)]
             _ => println!("A shapes rotation is not yet implemented")
         }
     }
-    pub fn rotate_xz(&mut self, angle:f64, origin:Vec3) {        
+    pub fn rotateY(&mut self, angle:f64, origin:Vec3) {        
         match self {
-            Shape::Triangle(x) => x.rotate_xz(angle, origin),
-            Shape::Cube(x) => x.rotate_xz(angle, origin),
+            Shape::Triangle(x) => x.rotateY(angle, origin),
+            Shape::Cube(x) => x.rotateY(angle, origin),
             #[allow(unreachable_patterns)]
             _ => println!("A shapes rotation is not yet implemented")
         }
     }
-    pub fn rotate_yz(&mut self, angle:f64, origin:Vec3) {        
+    pub fn rotateX(&mut self, angle:f64, origin:Vec3) {        
         match self {
-            Shape::Triangle(x) => x.rotate_yz(angle, origin),
-            Shape::Cube(x) => x.rotate_yz(angle, origin),
+            Shape::Triangle(x) => x.rotateX(angle, origin),
+            Shape::Cube(x) => x.rotateX(angle, origin),
             #[allow(unreachable_patterns)]
             _ => println!("A shapes rotation is not yet implemented")
         }
@@ -56,6 +62,7 @@ pub struct Vec2 {
     pub y: f64
 }
 
+#[derive(PartialEq)]
 pub struct Vec3 {
     pub x: f64,
     pub y: f64,
@@ -85,13 +92,15 @@ pub struct Surface {
     bottom_left: Vec3,
     bottom_right: Vec3
 }
-
+#[derive(Clone)]
+#[derive(PartialEq)]
 pub struct Triangle {
     pub A: Vec3, // Point A
     pub B: Vec3, // Point B
     pub C: Vec3, // Point C
 }
-
+#[derive(Clone)]
+#[derive(PartialEq)]
 pub struct Cube {
     position:Vec3,
     rotation:Vec3,
@@ -114,21 +123,21 @@ impl Vec3 {
     pub fn as_string(&self) -> String {
         format!("({}, {}, {})",self.x,self.y,self.z).to_string()
     }
-    pub fn rotate_xy(&mut self, angle:f64, origin: Vec3) {        
+    pub fn rotateZ(&mut self, angle:f64, origin: Vec3) {        
         *self = Self {
             x: ((self.x-origin.x)*angle.cos()+(self.y-origin.y)*-angle.sin())+origin.x,
             y: ((self.x-origin.x)*angle.sin()+(self.y-origin.y)*angle.cos())+origin.y,
             ..self.clone()
         };
     }
-    pub fn rotate_xz(&mut self, angle:f64, origin: Vec3) {
+    pub fn rotateY(&mut self, angle:f64, origin: Vec3) {
         *self = Self {
             x: ((self.x-origin.x)*angle.cos()+(self.z-origin.z)*-angle.sin())+origin.x,
             z: ((self.x-origin.x)*angle.sin()+(self.z-origin.z)*angle.cos())+origin.z,
             ..self.clone()
         }
     }
-    pub fn rotate_yz(&mut self, angle:f64, origin: Vec3) {
+    pub fn rotateX(&mut self, angle:f64, origin: Vec3) {
         *self = Self {
             y: ((self.y-origin.y)*angle.cos()+(self.z-origin.z)*-angle.sin())+origin.y,
             z: ((self.y-origin.y)*angle.sin()+(self.z-origin.z)*angle.cos())+origin.z,
@@ -206,18 +215,18 @@ impl Triangle {
             A, B,  C
         }
     }
-    pub fn intersects(&self, ray: &Ray) -> f64 {
+    pub fn intersects(&self, ray: &Ray) -> Lexip {
 
         // let accuracy: u32 = 16;
 
         if Vec3::dot(&self.get_normal(), &Vec3::sub(&self.A, &ray.point)) > 0.0 { // Check if the plane is facing the camera
-            return -1.0;
+            return Lexip::empty();
         }
 
         let denominator = Vec3::dot(&self.get_normal(), &ray.vector);
         // println!("Den {}", denominator);
         // println!("Normal {} {} {}", self.N.x, self.N.y, self.N.z);
-        if denominator == 0.0 {return -1.0}
+        if denominator == 0.0 {return Lexip::empty();}
 
         let t: f64 = Vec3::dot(&self.get_normal(), &Vec3::sub(&self.A, &ray.point))/denominator;
 
@@ -243,25 +252,31 @@ impl Triangle {
         // println!("{} {} {} {}", a,b,c,a+b+c);
         // let angle = Vec3::dot(&self.N, &Vec3::sub(&self.A, &ray.point));
         if a >= -0.01 && b >= -0.01 && c >= -0.01 && a+b+c <= 1.01 { // determine if it is inside the triangle using barycentric coordinates
-            // println!("{}",Vec3::sub(&ray.point, &intercept).len());
-            return Vec3::sub(&ray.point, &intercept).len();
+            let distance = Vec3::sub(&ray.point, &intercept).len() as f32;
+            return Lexip{
+                red: (255.0 * (5000.0/distance.powf(2.0))) as u8,
+                green: (255.0 * (5000.0/distance.powf(2.0))) as u8,
+                blue: (255.0 * (5000.0/distance.powf(2.0))) as u8,
+                distance,
+                collision_object: Shape::Triangle(self.Copy())
+            };
         }
-        -1.0
+        Lexip::empty()
     }
-    pub fn rotate_xy(&mut self, angle:f64, origin:Vec3) {
-        self.A.rotate_xy(angle, origin.clone());
-        self.B.rotate_xy(angle, origin.clone());
-        self.C.rotate_xy(angle, origin.clone());
+    pub fn rotateZ(&mut self, angle:f64, origin:Vec3) {
+        self.A.rotateZ(angle, origin.clone());
+        self.B.rotateZ(angle, origin.clone());
+        self.C.rotateZ(angle, origin.clone());
     }
-    pub fn rotate_xz(&mut self, angle:f64, origin:Vec3) {
-        self.A.rotate_xz(angle, origin.clone());
-        self.B.rotate_xz(angle, origin.clone());
-        self.C.rotate_xz(angle, origin.clone());
+    pub fn rotateY(&mut self, angle:f64, origin:Vec3) {
+        self.A.rotateY(angle, origin.clone());
+        self.B.rotateY(angle, origin.clone());
+        self.C.rotateY(angle, origin.clone());
     }
-    pub fn rotate_yz(&mut self, angle:f64, origin:Vec3) {
-        self.A.rotate_yz(angle, origin.clone());
-        self.B.rotate_yz(angle, origin.clone());
-        self.C.rotate_yz(angle, origin.clone());
+    pub fn rotateX(&mut self, angle:f64, origin:Vec3) {
+        self.A.rotateX(angle, origin.clone());
+        self.B.rotateX(angle, origin.clone());
+        self.C.rotateX(angle, origin.clone());
     }
     pub fn get_normal(&self) -> Vec3 {
         let a: Vec3 = Vec3::sub(&self.B, &self.A);
@@ -339,39 +354,40 @@ impl Cube {
         for i in faces {
             let mut tri = i[0].Copy();
             let mut tri2 = i[1].Copy();
-            tri.rotate_xy(self.rotation.z, self.position.clone());
-            tri2.rotate_xy(self.rotation.z, self.position.clone());
-            tri.rotate_yz(self.rotation.x, self.position.clone());
-            tri2.rotate_yz(self.rotation.x, self.position.clone());
-            tri.rotate_xz(self.rotation.y, self.position.clone());
-            tri2.rotate_xz(self.rotation.y, self.position.clone());
+            tri.rotateZ(self.rotation.z, self.position.clone());
+            tri2.rotateZ(self.rotation.z, self.position.clone());
+            tri.rotateX(self.rotation.x, self.position.clone());
+            tri2.rotateX(self.rotation.x, self.position.clone());
+            tri.rotateY(self.rotation.y, self.position.clone());
+            tri2.rotateY(self.rotation.y, self.position.clone());
             triangles.push(tri);
             triangles.push(tri2);
         };
         triangles
         
     }
-    pub fn intersects(&self, ray:&Ray) -> f64 {
-        let mut z: f64 = -1.0;
+    pub fn intersects(&self, ray:&Ray) -> Lexip {
+        let mut z: Lexip = Lexip{red:0, green:0, blue:0, distance:-1.0, collision_object: Shape::None};
         for i in self.get_triangles() {
             let c = i.intersects(ray);
-            if c < z && c != -1.0 || z == -1.0 {
+            if c.distance < z.distance && c.distance != -1.0 || z.distance == -1.0 {
                 z = c;
             }
         }
+        if z.collision_object != Shape::None {z.collision_object = Shape::Cube(self.clone())}
         z
     }
-    pub fn rotate_xy(&mut self, angle:f64, origin:Vec3) {
-        self.position.rotate_xy(angle, origin.clone());
-        self.rotation.rotate_xy(angle, origin);
+    pub fn rotateZ(&mut self, angle:f64, origin:Vec3) {
+        self.position.rotateZ(angle, origin.clone());
+        self.rotation.rotateZ(angle, origin);
     }
-    pub fn rotate_xz(&mut self, angle:f64, origin:Vec3) {
-        self.position.rotate_xz(angle, origin.clone());
-        self.rotation.rotate_xz(angle, origin);
+    pub fn rotateY(&mut self, angle:f64, origin:Vec3) {
+        self.position.rotateY(angle, origin.clone());
+        self.rotation.rotateY(angle, origin);
     }
-    pub fn rotate_yz(&mut self, angle:f64, origin:Vec3) {
-        self.position.rotate_yz(angle, origin.clone());
-        self.rotation.rotate_yz(angle, origin);
+    pub fn rotateX(&mut self, angle:f64, origin:Vec3) {
+        self.position.rotateX(angle, origin.clone());
+        self.rotation.rotateX(angle, origin);
     }
 }
 
@@ -390,7 +406,7 @@ impl Camera {
             }
         }
     }
-    pub fn get_pixel(&self, ox: u32, oy: u32, shapes: &[Shape]) -> Pixel {
+    pub fn get_pixel(&self, ox: u32, oy: u32, shapes: &[Shape]) -> Lexip {
         let x: f64 = ox as f64 + self.screen.bottom_left.x;
         let y: f64 = oy as f64 + self.screen.bottom_left.y;
         
@@ -398,15 +414,15 @@ impl Camera {
             point: Vec3{x,y,z: self.screen.bottom_left.z},
             vector: Vec3{x: x-self.position.x,y: y-self.position.y,z: self.screen.bottom_left.z-self.position.z}
         };
-        let mut current_z: f64 = -1.0;
+        let mut current_z: Lexip = Lexip::empty();
         for i in shapes.iter() {
-            let c: f64 = i.intersects(&ray);
-            if (c < current_z && c != -1.0) || current_z == -1.0 {current_z = c;}
+            let c: Lexip = i.intersects(&ray);
+            if (c.distance < current_z.distance && c.distance != -1.0) || current_z.distance == -1.0 {current_z = c;}
         }
         // if current_z > 0.0 { println!("{}",current_z); }
         // if current_z > 60.0 {return Pixel { position: Vec2{x:ox as f64,y:oy as f64}, value: Color::GREY };}
         // if current_z > 0.0 {return Pixel { position: Vec2{x:ox as f64,y:oy as f64}, value: Color::WHITE };}
-        Pixel { position: Vec2{x:ox as f64,y:oy as f64}, value: current_z }
+        current_z
     }
 }
 
@@ -423,3 +439,93 @@ fn round(x: f64, decimals: u32) -> f64 {
     let y = 10i32.pow(decimals) as f64;
     (x * y).round() / y
 }
+#[derive(Clone)]
+#[derive(PartialEq)]
+pub struct Object {
+    position: Vec3,
+    rotation: Vec3,
+    scale: f64,
+    faces: Vec<Triangle>
+}
+
+impl Object {
+    pub fn new(path: &str, position: Vec3, rotation: Vec3, scale: f64) -> Object {
+
+        let mut file = File::open(path).unwrap();
+
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).unwrap();
+        contents = contents.replace("\\\n", " ");
+
+        let mut vertices: Vec<Vec3> = Vec::new();
+        let mut faces: Vec<Triangle> = Vec::new();
+        for line in contents.lines() {
+            if line.starts_with('v') {
+                let l:Vec<&str> = line.get(2..).unwrap().split_whitespace().collect();
+                if l.len() == 3 {
+                    vertices.push(Vec3 { 
+                        x: l[0].parse::<f64>().unwrap()*scale, 
+                        y: l[1].parse::<f64>().unwrap()*scale, 
+                        z: l[2].parse::<f64>().unwrap()*scale
+                    });
+                }
+            }
+            else if line.starts_with('f') {
+                let l: Vec<&str> = line.get(2..).unwrap().split_whitespace().collect::<Vec<_>>()[0].split('/').collect();
+                    faces.push(Triangle::new(
+                        vertices[l[0].parse::<usize>().unwrap()-1].clone(), 
+                        vertices[l[1].parse::<usize>().unwrap()-1].clone(), 
+                        vertices[l[2].parse::<usize>().unwrap()-1].clone()
+                    ));
+            }
+        };
+        Object {
+            position,
+            rotation,
+            scale,
+            faces
+        }
+    }
+    pub fn intersects (&self, ray: &Ray) -> Lexip {
+        let mut z: Lexip = Lexip{red:0, green: 0, blue:0, distance: -1.0, collision_object:Shape::None};
+        for i in &self.faces {
+            let c: Lexip = i.intersects(ray);
+            if c.distance < z.distance && c.distance != -1.0 || z.distance == -1.0 {
+                z = c;
+            }
+        }
+        if z.collision_object != Shape::None {z.collision_object = Shape::Object(self.clone())}
+        z
+    }
+    // pub fn new_ball(pos: Vec3, rotation: Vec3, radius: f32, res: f32) -> Object {
+    //     let faces: Vec<Triangle> = Vec::new();
+
+    // }
+}
+
+#[derive(Clone)]
+pub struct Lexip {
+    pub red: u8,
+    pub green: u8,
+    pub blue: u8,
+    pub distance: f32,
+    pub collision_object: Shape
+}
+
+impl Lexip{
+    pub fn empty() -> Lexip {
+        Lexip {
+            red:0,
+            green:0,
+            blue:0,
+            distance:-1.0,
+            collision_object:Shape::None
+        }
+    }
+}
+
+
+
+
+
+
