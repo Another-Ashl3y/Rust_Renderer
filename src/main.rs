@@ -12,12 +12,12 @@ use sdl2::render::{Canvas, Texture, TextureCreator};
 use sdl2::video::{Window, WindowBuildError, WindowContext};
 
 use sdl2::{EventPump, VideoSubsystem};
-use shapes::{Cube, Camera, Vec3, Shape, Object, Lexip};
+use shapes::{Cube, Camera, Vec3, Shape, Object, Lexip, Lights, Sun};
 mod shapes;
 
 const width: u32 = 64;
 const height: u32 = 64;
-const pixel_size: u32 = 8;
+const pixel_size: u32 = 16;
 
 fn main() -> Result<(), String>{
     // Renderer stuff
@@ -31,7 +31,11 @@ fn main() -> Result<(), String>{
 
     let mut objects: Vec<Shape> = Vec::new();
     objects.push(Shape::Cube(Cube::new(Vec3{x:120.0,y: 50.0,z:200.0}, 80.0)));
-    objects.push(Shape::Cube(Cube::new(Vec3{x:-120.0,y:50.0,z:200.0}, 80.0)));
+    let mut lights: Vec<Lights> = Vec::new();
+    // lights.push(Lights::Sun(Sun{direction: Vec3{x:1.0,y:1.0,z:1.0}.normalize(), colour: Vec3{x:255.0,y:0.0,z:0.0}, intensity:1000}));
+    // lights.push(Lights::Sun(Sun{direction: Vec3{x:-1.0,y:1.0,z:1.0}.normalize(), colour: Vec3{x:0.0,y:0.0,z:255.0}, intensity:1000}));
+    // objects.push(Shape::Cube(Cube::new(Vec3{x:-120.0,y:50.0,z:200.0}, 80.0)));
+    // objects.push(Shape::Object(Object::new_ball(Vec3{x:-120.0,y:50.0,z:200.0}, Vec3 { x: 0.0, y: 0.0, z: 0.0}, 20.0, 0.1))); // broken
     // objects.push(Shape::Object(Object::new("test.obj", Vec3 {x:0.0,y:0.0,z:0.0},Vec3 {x:0.0,y:0.0,z:200.0}, 50.0)));
     // objects.push(Shape::Triangle(Triangle::new(
     //     Vec3{x:20.0,y:0.0,z:20.0}, 
@@ -55,9 +59,9 @@ fn main() -> Result<(), String>{
     objects[0].rotateZ(0.05, Vec3{x:0.0,y:0.0,z:0.0});
     objects[0].rotateY(-0.01, Vec3{x:20.0,y:0.0,z:150.0});
     objects[0].rotateX(0.1, Vec3{x:20.0,y:0.0,z:150.0});
-    objects[1].rotateZ(-0.05, Vec3{x:0.0,y:0.0,z:0.0});
-    objects[1].rotateY(0.01, Vec3{x:20.0,y:0.0,z:150.0});
-    objects[1].rotateX(-0.1, Vec3{x:20.0,y:0.0,z:150.0});
+    // objects[1].rotateZ(-0.05, Vec3{x:0.0,y:0.0,z:0.0});
+    // objects[1].rotateY(0.01, Vec3{x:20.0,y:0.0,z:150.0});
+    // objects[1].rotateX(-0.1, Vec3{x:20.0,y:0.0,z:150.0});
 
     'running: loop {
         for event in event_pump.poll_iter() {
@@ -75,7 +79,7 @@ fn main() -> Result<(), String>{
 
         for x in 0..width {
             for y in 0..height {
-                let p: Lexip = cam.get_pixel(x, y, &objects);
+                let p: Lexip = cam.get_pixel(x, y, &objects, &lights);
                 canvas.set_draw_color(Color::RGB(
                     p.red, 
                     p.green,
@@ -89,21 +93,22 @@ fn main() -> Result<(), String>{
             let x = (i / width as usize) as i32;
             let y = (i % height as usize) as i32;
             for n in [(0,-1),(1,0)] {
-                if ((y+n.0) + (x+n.1) * width as i32) < (width*height) as i32 && ((y+n.0) + (x+n.1) * width as i32) > 0 {
-                if collision_map[((y+n.0) + (x+n.1) * width as i32) as usize].collision_object != collision_map[i].collision_object {
+                if ((y+n.0) + (x+n.1) * width as i32) < (width*height) as i32 && ((y+n.0) + (x+n.1) * width as i32) > 0 &&
+                        collision_map[((y+n.0) + (x+n.1) * width as i32) as usize].collision_object != collision_map[i].collision_object 
+                {
                     canvas.set_draw_color(Color::RGB(
-                        clampi(((collision_map[i].red as i32+255 as i32)/2 as i32) as i32, 0, 255) as u8, 
-                        clampi(((collision_map[i].red as i32+255 as i32)/2 as i32) as i32, 0, 255) as u8, 
-                        clampi(((collision_map[i].red as i32+255 as i32)/2 as i32) as i32, 0, 255) as u8, 
+                        clampi((collision_map[i].red as i32)/2, 0, 255) as u8, 
+                        clampi((collision_map[i].green as i32)/2, 0, 255) as u8, 
+                        clampi((collision_map[i].blue as i32)/2, 0, 255) as u8, 
                     ));
-                    let _ = canvas.fill_rect(Rect::new(x as i32 * pixel_size as i32, y as i32 * pixel_size as i32, pixel_size, pixel_size));
-                }}
-
+                    let _ = canvas.fill_rect(Rect::new(x * pixel_size as i32, y * pixel_size as i32, pixel_size, pixel_size));
+                }
             }
         }//}
 
         // objects[0].rotate_xy(0.05, Vec3{x:0.0,y:0.0,z:0.0});
         objects[0].rotateZ(-0.007, Vec3{x:20.0,y:0.0,z:200.0});
+        // lights[0].direction.rotateX(-0.007, Vec3{x:0.0,y:0.0,z:0.0});
         objects[1].rotateZ(0.005, Vec3{x:20.0,y:0.0,z:200.0});
         // objects[0].rotate_yz(0.001, Vec3{x:20.0,y:0.0,z:150.0});
 

@@ -57,6 +57,11 @@ impl Shape {
     }
 }
 
+pub enum Lights {
+    Sun(Sun)
+}
+
+
 pub struct Vec2 {
     pub x: f64,
     pub y: f64
@@ -201,6 +206,7 @@ impl Vec3 {
 
         1.0 - Vec3::dot(&AV, AI)/Vec3::dot(&AV, AB)
     }
+
 }
 
 impl Clone for Vec3 {
@@ -219,7 +225,7 @@ impl Triangle {
 
         // let accuracy: u32 = 16;
 
-        if Vec3::dot(&self.get_normal(), &Vec3::sub(&self.A, &ray.point)) > 0.0 { // Check if the plane is facing the camera
+        if self.facing(&ray.point) { // Check if the plane is facing the camera
             return Lexip::empty();
         }
 
@@ -258,7 +264,8 @@ impl Triangle {
                 green: (255.0 * (5000.0/distance.powf(2.0))) as u8,
                 blue: (255.0 * (5000.0/distance.powf(2.0))) as u8,
                 distance,
-                collision_object: Shape::Triangle(self.Copy())
+                collision_object: Shape::Triangle(self.Copy()),
+                collision_normal: self.get_normal().clone()
             };
         }
         Lexip::empty()
@@ -293,6 +300,9 @@ impl Triangle {
             B: self.B.clone(),
             C: self.C.clone()
         }
+    }
+    pub fn facing(&self, ray: &Vec3) -> bool {
+        Vec3::dot(&self.get_normal(), &Vec3::sub(&self.A, &ray)) > 0.0
     }
 }
 
@@ -367,7 +377,7 @@ impl Cube {
         
     }
     pub fn intersects(&self, ray:&Ray) -> Lexip {
-        let mut z: Lexip = Lexip{red:0, green:0, blue:0, distance:-1.0, collision_object: Shape::None};
+        let mut z: Lexip = Lexip::empty();
         for i in self.get_triangles() {
             let c = i.intersects(ray);
             if c.distance < z.distance && c.distance != -1.0 || z.distance == -1.0 {
@@ -406,7 +416,7 @@ impl Camera {
             }
         }
     }
-    pub fn get_pixel(&self, ox: u32, oy: u32, shapes: &[Shape]) -> Lexip {
+    pub fn get_pixel(&self, ox: u32, oy: u32, shapes: &[Shape], lights: &[Lights]) -> Lexip {
         let x: f64 = ox as f64 + self.screen.bottom_left.x;
         let y: f64 = oy as f64 + self.screen.bottom_left.y;
         
@@ -422,6 +432,19 @@ impl Camera {
         // if current_z > 0.0 { println!("{}",current_z); }
         // if current_z > 60.0 {return Pixel { position: Vec2{x:ox as f64,y:oy as f64}, value: Color::GREY };}
         // if current_z > 0.0 {return Pixel { position: Vec2{x:ox as f64,y:oy as f64}, value: Color::WHITE };}
+        if current_z.collision_object != Shape::None {
+        for i in lights.iter() {
+            match i {
+                Lights::Sun(x) => {
+                    if Vec3::dot(&current_z.collision_normal, &x.direction) < 0.0 {
+                        current_z.red = ((current_z.red as f64 + x.colour.x)/2.0) as u8;
+                        current_z.green = ((current_z.green as f64 + x.colour.y)/2.0) as u8;
+                        current_z.blue = ((current_z.blue as f64 + x.colour.z)/2.0) as u8;
+                    }
+                },
+                _=> {}
+            }
+        }}
         current_z
     }
 }
@@ -487,7 +510,7 @@ impl Object {
         }
     }
     pub fn intersects (&self, ray: &Ray) -> Lexip {
-        let mut z: Lexip = Lexip{red:0, green: 0, blue:0, distance: -1.0, collision_object:Shape::None};
+        let mut z: Lexip = Lexip::empty();
         for i in &self.faces {
             let c: Lexip = i.intersects(ray);
             if c.distance < z.distance && c.distance != -1.0 || z.distance == -1.0 {
@@ -497,10 +520,36 @@ impl Object {
         if z.collision_object != Shape::None {z.collision_object = Shape::Object(self.clone())}
         z
     }
-    // pub fn new_ball(pos: Vec3, rotation: Vec3, radius: f32, res: f32) -> Object {
-    //     let faces: Vec<Triangle> = Vec::new();
-
-    // }
+    pub fn new_ball(pos: Vec3, rotation: Vec3, radius: f32, res: f32) -> Object {
+        if res <= 0.0 {panic!("resolution must be positive")}
+        let mut faces: Vec<Triangle> = Vec::new();
+        let mut points: Vec<Vec3> = Vec::new();
+        let mut flat_points: Vec<Vec2> = Vec::new();
+        let mut x: f32 = -radius;
+        while x < radius {
+            flat_points.push(Vec2 {x: x as f64, y: (radius.powi(2)-x.powi(2)).powf(0.5) as f64});
+            flat_points.push(Vec2 {x: x as f64, y: -(radius.powi(2)-x.powi(2)).powf(0.5) as f64});
+            x += res;
+        }
+        for i in flat_points {
+            points.push(Vec3{x: i.x + pos.x, y: i.y + pos.y, z: (radius.powi(2) as f64 -(i.x.powi(2) + i.y.powi(2))).powf(0.5) + pos.z});
+            points.push(Vec3{x: i.x + pos.x, y: i.y + pos.y, z: -(radius.powi(2) as f64 -(i.x.powi(2) + i.y.powi(2))).powf(0.5) + pos.z});
+        }
+        for x in &points {
+            for y in &points {
+                for z in &points {
+                    faces.push(Triangle{A:x.clone(), B: y.clone(), C: z.clone()});
+                    println!("Faces : {}", faces.len());
+                }
+            }
+        }
+        Object {
+            position: pos,
+            rotation,
+            scale: 1.0,
+            faces
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -509,7 +558,8 @@ pub struct Lexip {
     pub green: u8,
     pub blue: u8,
     pub distance: f32,
-    pub collision_object: Shape
+    pub collision_object: Shape,
+    pub collision_normal: Vec3
 }
 
 impl Lexip{
@@ -519,13 +569,18 @@ impl Lexip{
             green:0,
             blue:0,
             distance:-1.0,
-            collision_object:Shape::None
+            collision_object:Shape::None,
+            collision_normal: Vec3 { x: -1.0, y: -1.0, z: -1.0 }
         }
     }
 }
 
-
-
+pub struct Sun {
+    pub direction: Vec3,
+    pub position: Vec3,
+    pub colour: Vec3,
+    pub intensity: i32
+}
 
 
 
