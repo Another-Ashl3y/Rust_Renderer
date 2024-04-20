@@ -55,6 +55,14 @@ impl Shape {
             _ => println!("A shapes rotation is not yet implemented")
         }
     }
+    pub fn translate(&mut self, translation: Vec3) {
+        match self {
+            Shape::Triangle(x) => x.translate(translation),
+            Shape::Cube(x) => x.translate(translation),
+            #[allow(unreachable_patterns)]
+            _ => println!("A shapes rotation is not yet implemented")
+        }
+    }
 }
 
 pub enum Lights {
@@ -88,7 +96,7 @@ pub struct Camera {
     position: Vec3,
     screen: Surface,
     FOV: f64,
-    pixel_size: u32
+    pixel_size: usize
 }
 
 pub struct Surface {
@@ -285,6 +293,11 @@ impl Triangle {
         self.B.rotateX(angle, origin.clone());
         self.C.rotateX(angle, origin.clone());
     }
+    pub fn translate(&mut self, translation:Vec3) {
+        self.A = Vec3::add(&self.A, &translation);
+        self.B = Vec3::add(&self.B, &translation);
+        self.C = Vec3::add(&self.C, &translation);
+    }
     pub fn get_normal(&self) -> Vec3 {
         let a: Vec3 = Vec3::sub(&self.B, &self.A);
         let b: Vec3 = Vec3::sub(&self.C, &self.A);
@@ -399,10 +412,13 @@ impl Cube {
         self.position.rotateX(angle, origin.clone());
         self.rotation.rotateX(angle, origin);
     }
+    pub fn translate(&mut self, translation:Vec3) {
+        self.position = Vec3::add(&self.position, &translation);
+    }
 }
 
 impl Camera {
-    pub fn new(position: Vec3, FOV: f64, width: u32, height: u32, pixel_size: u32) -> Camera {
+    pub fn new(position: Vec3, FOV: f64, width: usize, height: usize, pixel_size: usize) -> Camera {
         let z: f64 = position.z+((width as f64/2.0)/((FOV/2.0).tan()));
         Camera {
             position: position.clone(),
@@ -416,7 +432,7 @@ impl Camera {
             }
         }
     }
-    pub fn get_pixel(&self, ox: u32, oy: u32, shapes: &[Shape], lights: &[Lights]) -> Lexip {
+    pub fn get_pixel(&self, ox: usize, oy: usize, shapes: &[Shape], lights: &[Lights]) -> Lexip {
         let x: f64 = ox as f64 + self.screen.bottom_left.x;
         let y: f64 = oy as f64 + self.screen.bottom_left.y;
         
