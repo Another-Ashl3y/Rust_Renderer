@@ -1,44 +1,46 @@
 #![allow(unused_imports)] // Remove later
 #![allow(non_upper_case_globals)]
 
-use std::time::Duration;
+use std::{ops::Not, time::{Duration, Instant}};
 
-use minifb::{Key, Window, WindowOptions};
+use minifb::{Key, Window, WindowOptions, MouseMode};
+use noise::Turbulence;
+use rayon::prelude::*;
 
-use shapes::{Cube, Camera, Vec3, Shape, Object, Lexip, Lights, Sun};
+use shapes::{Camera, Cube, Lexip, Lights, Shape, Sun, Vec2, Vec3};
 mod shapes;
 
-const WIDTH: usize = 64;
-const HEIGHT: usize = 64;
-const pixel_size: usize = 16;
-const DYNAMIC_SIZE: bool = true;
-const REFRESH_RATE: u64 = 240;
+
+const size: f32 = 5.0;
+const WIDTH: usize = (size*16.0) as usize;
+const HEIGHT: usize = (size*9.0) as usize;
+const pixel_size: usize = 6;
+
+const MOVE_SPEED: f32 = 300.0;
+const TURN_SPEED: f32 = 5.0;
 
 fn main() {
-    let fov: f64 = 90.0;
+    println!("Initialized");
+    let fov: f32 = 70.0;
 
-    let cam: Camera = Camera::new(Vec3 {x:0.0, y:0.0, z:-100.0}, fov, WIDTH, HEIGHT, pixel_size);
+    let mut cam: Camera = Camera::new(Vec3 {x:0.0, y:0.0, z:-200.0}, Vec3 {x:0.0, y: 0.0, z: 0.0}, fov, WIDTH, HEIGHT, pixel_size);
 
     let mut objects: Vec<Shape> = Vec::new();
-    objects.push(Shape::Cube(Cube::new(Vec3{x:120.0,y: 50.0,z:100.0}, 80.0)));
-    // objects.push(Shape::Cube(Cube::new(Vec3{x:-120.0,y: 50.0,z:-100.0}, 80.0)));
-    // objects.push(Shape::Cube(Cube::new(Vec3{x:120.0,y: 50.0,z:-100.0}, 80.0)));
-    // objects.push(Shape::Cube(Cube::new(Vec3{x:-120.0,y: 50.0,z:100.0}, 80.0)));
-    let mut lights: Vec<Lights> = Vec::new();
+    // objects.push(Shape::Cube(Cube::new(Vec3{x:120.0,y: 50.0,z:100.0}, 80.0)));
+    objects.push(Shape::Cube(Cube::new(Vec3{x:120.0,y: 50.0,z:0.0}, 120.0)));
+    // objects.push(Shape::Cube(Cube::new(Vec3{x:0.0,y: 100.0,z:0.0}, 10.0)));
+    // objects.push(Shape::Cube(Cube::new(Vec3{x:0.0,y: 50.0,z:100.0}, 50.0)));
+
     
-    // build screen
-    const fn scale_to_int(scale: minifb::Scale) -> u8 {
-        use minifb::Scale::*;
-        match scale {
-            X1 => 1,
-            X2 => 2,
-            X4 => 4,
-            X8 => 8,
-            X16 => 16,
-            X32 => 32,
-            FitScreen => 1,
-        }
-    }
+
+    let mut lights: Vec<Lights> = Vec::new();
+    lights.push(Lights::Sun(Sun { direction: Vec3 { x: 1.0, y: 0.0, z: 0.0 }, colour: Vec3 {x: 140.0, y: 140.0, z: 140.0} }));
+    lights.push(Lights::Sun(Sun { direction: Vec3 { x: 0.0, y: 1.0, z: 0.0 }, colour: Vec3 {x: 140.0, y: 0.0, z: 140.0} }));
+    lights.push(Lights::Sun(Sun { direction: Vec3 { x: 0.0, y: 0.0, z: 1.0 }, colour: Vec3 {x: 230.0, y: 140.0, z: 140.0} }));
+    lights.push(Lights::Sun(Sun { direction: Vec3 { x: -1.0, y: 0.0, z: 0.0 }, colour: Vec3 {x: 140.0, y: 140.0, z: 0.0} }));
+    lights.push(Lights::Sun(Sun { direction: Vec3 { x: 0.0, y: -1.0, z: 0.0 }, colour: Vec3 {x: 0.0, y: 140.0, z: 140.0} }));
+    lights.push(Lights::Sun(Sun { direction: Vec3 { x: 0.0, y: 0.0, z: -1.0 }, colour: Vec3 {x: 140.0, y: 255.0, z: 140.0} }));
+    
     const SCALE: minifb::Scale = minifb::Scale::X1;
     
     let mut window = Window::new(
@@ -46,91 +48,102 @@ fn main() {
         WIDTH*pixel_size,
         HEIGHT*pixel_size,
         WindowOptions {
-            // borderless: true,
-            title: true,
-            resize: DYNAMIC_SIZE,
+            resize: true,
             scale: SCALE,
-            // transparency: true,
             ..WindowOptions::default()
         },
     )
     .unwrap();
-    window.limit_update_rate(Some(Duration::from_nanos(1_000_000_000 / REFRESH_RATE)));
-    // window.limit_update_rate(60);
-
-    // objects[0].rotateZ(0.05, Vec3{x:0.0,y:0.0,z:0.0});
-    // objects[0].rotateY(-0.01, Vec3{x:20.0,y:0.0,z:150.0});
-    // objects[0].rotateX(0.1, Vec3{x:20.0,y:0.0,z:150.0});
-    // objects[1].rotateZ(-0.05, Vec3{x:0.0,y:0.0,z:0.0});
-    // objects[1].rotateY(0.01, Vec3{x:20.0,y:0.0,z:150.0});
-    // objects[1].rotateX(-0.1, Vec3{x:20.0,y:0.0,z:150.0});
 
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        let mut buffer = vec![0u32; WIDTH * HEIGHT];
-        // println!("{}", buffer.len());
 
-        let mut collision_map: Vec<Lexip> = Vec::new();
         window.set_background_color(0, 0, 0);
-        for x in 0..WIDTH {
-            for y in 0..HEIGHT {
-                let p: Lexip = cam.get_pixel(x, y, &objects, &lights);
-                // canvas.set_draw_color(Color::RGB(
-                //     p.red, 
-                //     p.green,
-                //     p.blue
-                // ));
-                // let _ = canvas.fill_rect(Rect::new(x as i32 * pixel_size as i32, y as i32 * pixel_size as i32, pixel_size, pixel_size));
-                collision_map.push(p);
-                if y+x*WIDTH < buffer.len() && y+x*WIDTH > 0 {
-                    buffer[y+x*WIDTH] = clampi((collision_map[y+x*WIDTH].blue as i32)/2, 0, 255) as u32;
+
+        let start = Instant::now();
+
+        let buffer: Vec<u32> = (0..(WIDTH*HEIGHT)).into_iter().map(|i| 
+            {
+                let point = dimension_expansion(i);
+                if (8.0*point.x-point.y + 8.0) < 0.0 || (-8.0*point.x-point.y+WIDTH as f32*8.0) < 0.0{
+                    return from_u8_rgb(140, 140, 140);
                 }
-            }
-        }
-        for i in 0..collision_map.clone().into_iter().len() {// if collision_map[i].collision_object != Shape::None {
-            let x = (i / WIDTH as usize) as i32;
-            let y = (i % HEIGHT as usize) as i32;
-            for n in [(0,-1),(1,0)] {
-                if ((y+n.0) + (x+n.1) * WIDTH as i32) < (WIDTH*HEIGHT) as i32 && ((y+n.0) + (x+n.1) * WIDTH as i32) > 0 &&
-                        collision_map[((y+n.0) + (x+n.1) * WIDTH as i32) as usize].collision_object != collision_map[i].collision_object 
-                {
-                    buffer[i] = 0x255;
-                    // canvas.set_draw_color(Color::RGB(
-                    //     clampi((collision_map[i].red as i32)/2, 0, 255) as u8, 
-                    //     clampi((collision_map[i].green as i32)/2, 0, 255) as u8, 
-                    //     clampi((collision_map[i].blue as i32)/2, 0, 255) as u8, 
-                    // ));
-                    // let _ = canvas.fill_rect(Rect::new(x * pixel_size as i32, y * pixel_size as i32, pixel_size, pixel_size));
-                    // window
-                    // .update_with_buffer(buf.as_rgba(), buf.width(), buf.height())
-                    // .unwrap();
-                    
+                else if point.y == (WIDTH as f32*0.75).round() {
+                    return from_u8_rgb(20, 20, 20);
                 }
+                else if point.y > (WIDTH as f32 * 0.75).round() {
+                    return from_u8_rgb(50, 50, 60);
+                }
+                let p: Lexip = cam.get_pixel(point.x as usize, point.y as usize, &objects, &lights);
+                from_u8_rgb(p.red, p.green, p.blue)
             }
-        }//}
+        ).collect();
+        
+
         window.update_with_buffer(&buffer, WIDTH, HEIGHT).unwrap();
+        
+        let took = start.elapsed();
+        let delta = took.as_secs_f32();
 
-        // objects[0].rotate_xy(0.05, Vec3{x:0.0,y:0.0,z:0.0});
-        objects[0].rotateZ(-0.007, Vec3{x:20.0,y:0.0,z:200.0});
-        // objects[0].translate(Vec3{x:0.0,y:0.0,z:-1.0});
-        // lights[0].direction.rotateX(-0.007, Vec3{x:0.0,y:0.0,z:0.0});
-        // objects[1].rotateZ(0.005, Vec3{x:20.0,y:0.0,z:200.0});
-        // objects[0].rotate_yz(0.001, Vec3{x:20.0,y:0.0,z:150.0});
+        println!("{} fps", 1.0/delta);
+        
+        // println!("{}, {}, {}", 
+        // (cam.rotation.x.to_degrees() % 360.0).abs(),
+        // cam.rotation.y.to_degrees(),
+        // cam.rotation.z.to_degrees());
 
-        // canvas.present();
-        ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 30));
-        // The rest of the game loop goes here...
+        if window.is_key_down(Key::W) {
+            cam.move_forward(Vec3 {x: 0.0, y: 0.0, z: MOVE_SPEED*delta});
+        }
+        if window.is_key_down(Key::S) {
+            cam.move_forward(Vec3 {x: 0.0, y: 0.0, z: -MOVE_SPEED*delta});
+        }
+        if window.is_key_down(Key::A) {
+            // cam.rotate(Vec3 {x: 0.0, y: 0.0, z: -TURN_SPEED*delta});
+            cam.move_forward(Vec3 {x: -MOVE_SPEED*delta, y: 0.0, z: 0.0});
+        }
+        if window.is_key_down(Key::D) {
+            // cam.rotate(Vec3 {x: 0.0, y: 0.0, z: TURN_SPEED*delta});
+            cam.move_forward(Vec3 {x: MOVE_SPEED*delta, y: 0.0, z: 0.0});
+        }
+        if window.is_key_down(Key::Up) {
+            cam.rotate(Vec3 { x: TURN_SPEED*delta, y: 0.0, z: 0.0 });
+        }
+        if window.is_key_down(Key::Down) {
+            cam.rotate(Vec3 { x: -TURN_SPEED*delta, y: 0.0, z: 0.0 });
+        }
+        if window.is_key_down(Key::Left) {
+            cam.rotate(Vec3 { x: 0.0, y: TURN_SPEED*delta, z: 0.0 });
+        }
+        if window.is_key_down(Key::Right) {
+            cam.rotate(Vec3 { x: 0.0, y: -TURN_SPEED*delta, z: 0.0 });
+        }
+
     }
-    // Ok(())
 }
 
 
-fn clampi(n: i32, low: i32, high: i32) -> i32 {
-    if n > high {
-        return high;
-    }
-    if n < low {
-        return low;
-    }
-    n
+// fn clampi(n: i32, low: i32, high: i32) -> i32 {
+//     if n > high {
+//         return high;
+//     }
+//     if n < low {
+//         return low;
+//     }
+//     n
+// }
+
+fn from_u8_rgb(r: u8, g: u8, b: u8) -> u32 {
+    let (r, g, b) = (r as u32, g as u32, b as u32);
+    (r << 16) | (g << 8) | b
 }
+
+fn dimension_expansion(i: usize) -> Vec2 {
+    Vec2 {
+        x: (i % WIDTH) as f32,
+        y: (i / HEIGHT) as f32 
+    }
+}
+// fn dimension_shrink(i: Vec2) -> usize {
+//     (WIDTH as f32 * i.x + i.y) as usize
+// }
